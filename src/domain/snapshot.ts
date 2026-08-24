@@ -18,6 +18,8 @@ export interface WorkflowSnapshotEnvelope {
   agreement: AgreementState
   furthestStepIndex: number
   invitedRole?: PartyRole
+  documentName?: string
+  documentNameCustomized?: boolean
 }
 
 export type SnapshotDecodeResult =
@@ -132,7 +134,9 @@ function isSnapshot(value: unknown): value is WorkflowSnapshotEnvelope {
     Number.isInteger(snapshot.furthestStepIndex) &&
     snapshot.furthestStepIndex >= 0 &&
     snapshot.furthestStepIndex <= 10 &&
-    (snapshot.invitedRole === undefined || isPartyRole(snapshot.invitedRole))
+    (snapshot.invitedRole === undefined || isPartyRole(snapshot.invitedRole)) &&
+    (snapshot.documentName === undefined || typeof snapshot.documentName === 'string') &&
+    (snapshot.documentNameCustomized === undefined || typeof snapshot.documentNameCustomized === 'boolean')
   )
 }
 

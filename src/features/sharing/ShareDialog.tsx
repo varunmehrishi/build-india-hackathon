@@ -7,10 +7,12 @@ interface ShareDialogProps {
   agreement: AgreementState
   furthestStepIndex: number
   activeRole: PartyRole
+  documentName: string
+  documentNameCustomized: boolean
   onClose: () => void
 }
 
-export function ShareDialog({ agreement, furthestStepIndex, activeRole, onClose }: ShareDialogProps) {
+export function ShareDialog({ agreement, furthestStepIndex, activeRole, documentName, documentNameCustomized, onClose }: ShareDialogProps) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'fallback'>('idle')
   const linkRef = useRef<HTMLTextAreaElement>(null)
   const invitedRole: PartyRole = activeRole === 'landlord' ? 'tenant' : 'landlord'
@@ -21,6 +23,8 @@ export function ShareDialog({ agreement, furthestStepIndex, activeRole, onClose 
         agreement,
         furthestStepIndex,
         invitedRole,
+        documentName,
+        documentNameCustomized,
       }
       return { url: createSnapshotUrl(snapshot), error: '' }
     } catch (error) {
@@ -29,7 +33,7 @@ export function ShareDialog({ agreement, furthestStepIndex, activeRole, onClose 
         error: error instanceof Error ? error.message : 'This agreement could not be shared.',
       }
     }
-  }, [agreement, furthestStepIndex, invitedRole])
+  }, [agreement, furthestStepIndex, invitedRole, documentName, documentNameCustomized])
 
   useEffect(() => document.getElementById('close-share-dialog')?.focus(), [])
 

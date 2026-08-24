@@ -6,9 +6,10 @@ interface StepperProps {
   activeStepId: WorkflowStepConfig['id']
   onSelectStep: (stepId: WorkflowStepConfig['id']) => void
   maxSelectableIndex?: number
+  minSelectableIndex?: number
 }
 
-export function Stepper({ steps, activeStepId, onSelectStep, maxSelectableIndex }: StepperProps) {
+export function Stepper({ steps, activeStepId, onSelectStep, maxSelectableIndex, minSelectableIndex }: StepperProps) {
   const activeIndex = steps.findIndex((step) => step.id === activeStepId)
 
   return (
@@ -16,7 +17,9 @@ export function Stepper({ steps, activeStepId, onSelectStep, maxSelectableIndex 
       {steps.map((step, index) => {
         const state =
           index < activeIndex ? 'done' : index === activeIndex ? 'current' : 'todo'
-        const isLocked = maxSelectableIndex !== undefined && index > maxSelectableIndex
+        const isLocked =
+          (maxSelectableIndex !== undefined && index > maxSelectableIndex) ||
+          (minSelectableIndex !== undefined && index < minSelectableIndex)
 
         return (
           <button

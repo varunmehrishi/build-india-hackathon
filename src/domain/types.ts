@@ -83,6 +83,7 @@ export interface IntakeDraft {
   startDate: string
   landlordName: string
   tenantName: string
+  documentName: string
 }
 
 export type IntakeField = keyof IntakeDraft

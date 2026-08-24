@@ -13,7 +13,7 @@ import {
   type DemoAuthSession,
 } from './domain/auth'
 import { workflowStepOrder, workflowSteps } from './domain/demoData'
-import { applyIntakeDraft } from './domain/intake'
+import { applyIntakeDraft, suggestDocumentName } from './domain/intake'
 import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
 import type { IntakeDraft, WorkflowStep } from './domain/types'
 import {
@@ -36,6 +36,7 @@ import { IntentScreen } from './features/intake/IntentScreen'
 import { ShareDialog } from './features/sharing/ShareDialog'
 
 type AuthState = DemoAuthSession | null | undefined
+const finalizedStepIndex = workflowStepOrder.indexOf('finalized')
 
 function roleName(snapshot: WorkflowSnapshotEnvelope | null): string | undefined {
   if (!snapshot?.invitedRole) return undefined
@@ -170,9 +171,9 @@ function App() {
   }
 
   function updateWorkflowStep(step: WorkflowStep) {
-    if (state.finalized) return
     const nextIndex = workflowStepOrder.indexOf(step)
     if (nextIndex > furthestStepIndex) return
+    if (state.finalized && nextIndex < finalizedStepIndex) return
     mutateActiveDocument((current) => ({
       ...current,
       agreement: {
@@ -187,8 +188,8 @@ function App() {
   }
 
   function moveStep(offset: number) {
-    if (state.finalized) return
-    const nextIndex = Math.max(0, Math.min(workflowSteps.length - 1, activeIndex + offset))
+    const minimumIndex = state.finalized ? finalizedStepIndex : 0
+    const nextIndex = Math.max(minimumIndex, Math.min(workflowSteps.length - 1, activeIndex + offset))
     mutateActiveDocument((current) => ({
       ...current,
       furthestStepIndex: Math.max(current.furthestStepIndex, nextIndex),
@@ -218,9 +219,13 @@ function App() {
 
     mutateActiveDocument((current) => {
       const field = activeRole === 'landlord' ? 'landlordName' : 'tenantName'
+      const nextDraft = { ...current.intakeDraft, [field]: displayName }
+      if (!current.documentNameCustomized) {
+        nextDraft.documentName = suggestDocumentName(nextDraft.landlordName, nextDraft.tenantName)
+      }
       return {
         ...current,
-        intakeDraft: { ...current.intakeDraft, [field]: displayName },
+        intakeDraft: nextDraft,
         agreement: current.agreement.intakeCompleted
           ? {
               ...current.agreement,
@@ -237,6 +242,10 @@ function App() {
     let adjusted = { ...nextDraft }
     const previousRole = draft.initiator
     const nextRole = adjusted.initiator
+    const partyNamesChanged =
+      nextDraft.landlordName !== draft.landlordName || nextDraft.tenantName !== draft.tenantName
+    const documentNameChanged = nextDraft.documentName !== draft.documentName
+    const documentNameCustomized = document.documentNameCustomized || (documentNameChanged && !partyNamesChanged)
 
     if (authSession && nextRole !== previousRole) {
       if (previousRole && nextRole) {
@@ -250,9 +259,14 @@ function App() {
       adjusted[selectedField] = authSession.displayName
     }
 
+    if (!documentNameCustomized) {
+      adjusted.documentName = suggestDocumentName(adjusted.landlordName, adjusted.tenantName)
+    }
+
     mutateActiveDocument((current) => ({
       ...current,
       intakeDraft: adjusted,
+      documentNameCustomized,
       localRole: nextRole || current.localRole,
     }))
 
@@ -283,10 +297,9 @@ function App() {
 
   function finalizeDocument() {
     if (!activeRole || !state.intakeCompleted || state.finalized) return
-    const finalizedIndex = workflowStepOrder.indexOf('finalized')
     mutateActiveDocument((current) => ({
       ...current,
-      furthestStepIndex: Math.max(current.furthestStepIndex, finalizedIndex),
+      furthestStepIndex: Math.max(current.furthestStepIndex, finalizedStepIndex),
       agreement: {
         ...current.agreement,
         workflowStep: 'finalized',
@@ -345,38 +358,50 @@ function App() {
 
         {notice ? <div className="app-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div> : null}
 
-        {state.finalized ? (
-          <FinalizedView agreement={state} localRole={activeRole} />
-        ) : state.workflowStep === 'intent' ? (
+        {!state.finalized && state.workflowStep === 'intent' ? (
           <IntentScreen initialValue={state.intentText} onContinue={beginRentWorkflow} />
-        ) : state.workflowStep === 'details' ? (
+        ) : !state.finalized && state.workflowStep === 'details' ? (
           <DetailsScreen draft={draft} onDraftChange={updateDraft} onBack={() => updateWorkflowStep('intent')} onSubmit={submitDetails} />
         ) : (
           <div className="journey-layout">
             <aside className="sidebar">
               <Card>
                 <div className="section-heading"><p className="eyebrow">Journey</p><h2>Steps</h2></div>
-                <Stepper steps={workflowSteps} activeStepId={state.workflowStep} onSelectStep={updateWorkflowStep} maxSelectableIndex={furthestStepIndex} />
+                <Stepper
+                  steps={workflowSteps}
+                  activeStepId={state.workflowStep}
+                  onSelectStep={updateWorkflowStep}
+                  maxSelectableIndex={furthestStepIndex}
+                  minSelectableIndex={state.finalized ? finalizedStepIndex : undefined}
+                />
               </Card>
             </aside>
 
             <main className="content" id="main-content">
-              <Card className="stage-card">
-                <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>
-                <p className="stage-description">{activeStep.description}</p>
-                <div className="transaction-summary">
-                  <span><small>Transaction</small><strong>{state.durationMonths}-month residential tenancy</strong></span>
-                  <span><small>Location</small><strong>{state.property.city}, {state.property.state}</strong></span>
-                  <span><small>Snapshot</small><strong>Revision {state.snapshotRevision}</strong></span>
-                </div>
-                <div className="placeholder-panel">
-                  <p className="placeholder-title">Coming in the next milestone</p>
-                  <ul className="placeholder-list">{activeStep.placeholderPoints.map((point) => <li key={point}>{point}</li>)}</ul>
-                </div>
-              </Card>
+              {state.workflowStep === 'finalized' ? (
+                <FinalizedView agreement={state} localRole={activeRole} />
+              ) : (
+                <Card className="stage-card">
+                  <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>
+                  <p className="stage-description">{activeStep.description}</p>
+                  <div className="transaction-summary">
+                    <span><small>Transaction</small><strong>{state.durationMonths}-month residential tenancy</strong></span>
+                    <span><small>Location</small><strong>{state.property.city}, {state.property.state}</strong></span>
+                    <span><small>Snapshot</small><strong>Revision {state.snapshotRevision}</strong></span>
+                  </div>
+                  <div className="placeholder-panel">
+                    <p className="placeholder-title">Coming in the next milestone</p>
+                    <ul className="placeholder-list">{activeStep.placeholderPoints.map((point) => <li key={point}>{point}</li>)}</ul>
+                  </div>
+                </Card>
+              )}
               <div className="journey-actions">
-                <Button variant="ghost" onClick={() => moveStep(-1)}>Back</Button>
-                {state.workflowStep === 'review' ? <Button onClick={finalizeDocument}>Finalize document</Button> : <Button onClick={() => moveStep(1)}>Continue</Button>}
+                <Button variant="ghost" onClick={() => moveStep(-1)} disabled={state.workflowStep === 'finalized'}>Back</Button>
+                {state.workflowStep === 'review' ? (
+                  <Button onClick={finalizeDocument}>Finalize document</Button>
+                ) : (
+                  <Button onClick={() => moveStep(1)} disabled={state.workflowStep === 'complete'}>Continue</Button>
+                )}
               </div>
             </main>
           </div>
@@ -391,7 +416,14 @@ function App() {
       ) : null}
 
       {shareSource && authSession && activeRole ? (
-        <ShareDialog agreement={shareSource.agreement} furthestStepIndex={shareSource.furthestStepIndex} activeRole={activeRole} onClose={() => setShareSource(null)} />
+        <ShareDialog
+          agreement={shareSource.agreement}
+          furthestStepIndex={shareSource.furthestStepIndex}
+          activeRole={activeRole}
+          documentName={shareSource.intakeDraft.documentName}
+          documentNameCustomized={shareSource.documentNameCustomized}
+          onClose={() => setShareSource(null)}
+        />
       ) : null}
     </PageContainer>
   )

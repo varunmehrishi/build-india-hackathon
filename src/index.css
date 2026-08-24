@@ -277,6 +277,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .form-section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 0.8rem; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .form-grid .field:has(.textarea) { grid-column: 1 / -1; }
+.form-grid .field:has(.document-name-input) { grid-column: 1 / -1; }
 .role-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; outline: 0; }
 .role-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; margin: 8px 0; }
 .role-option { display: flex; align-items: center; gap: 9px; padding: 13px; border: 1px solid var(--border-strong); border-radius: 13px; background: white; cursor: pointer; }
@@ -306,7 +307,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .placeholder-list { margin: 0; padding-left: 18px; display: grid; gap: 7px; color: var(--muted); }
 .journey-actions { justify-content: space-between; }
 
-.finalized-content { width: min(920px, 100%); margin: 34px auto 80px; }
+.finalized-content { width: 100%; }
 .finalized-card { display: grid; gap: 24px; padding: clamp(24px, 5vw, 44px); }
 .finalized-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .finalized-heading h1 { font-size: clamp(2.4rem, 5vw, 4rem); }

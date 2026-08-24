@@ -11,6 +11,7 @@ Frontend-only React + TypeScript + Vite prototype for the rent-agreement hackath
 - Intent routing and a validated, editable tenancy-details intake.
 - Editable local profiles synchronized with the signed-in agreement party.
 - Persistent browser-local workspaces with multiple rent-agreement documents.
+- Editable document names suggested from the landlord and tenant names.
 - Point-in-time Base64URL import/export for two-device collaboration.
 - Placeholder screens for the remaining journey steps.
 - Reset Demo control.
@@ -38,13 +39,18 @@ npm run lint
 ## Collaboration model
 
 Documents and in-progress drafts are saved in the browser. A simple selector allows multiple
-agreements to be retained and reopened across reloads and login sessions.
+agreements to be retained and reopened across reloads and login sessions. New agreements are
+named from both parties by default, and custom names remain stable when party details change.
 
 Sharing is available after a landlord or tenant finalizes the active document. **Share** exports
 the latest saved document as a point-in-time Base64URL invite for the other role. Opening an
 invite imports or replaces the matching document in local storage, activates it, and removes the
 payload from the address bar. There is no real-time synchronization or government identity
 integration.
+
+Finalizing locks the agreement content but keeps the journey active. The demo can continue
+through the existing Stamp duty, Identity, Notary, eSign, and Completion placeholder steps,
+while the pre-finalization steps remain locked.
 
 ## Deployment
 

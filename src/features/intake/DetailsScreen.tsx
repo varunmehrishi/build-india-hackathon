@@ -22,6 +22,7 @@ interface DetailsScreenProps {
 const fieldOrder: IntakeField[] = [
   'initiator', 'state', 'city', 'address', 'propertyType', 'monthlyRent',
   'securityDeposit', 'durationMonths', 'startDate', 'landlordName', 'tenantName',
+  'documentName',
 ]
 
 export function DetailsScreen({ draft, onDraftChange, onBack, onSubmit }: DetailsScreenProps) {
@@ -122,6 +123,7 @@ export function DetailsScreen({ draft, onDraftChange, onBack, onSubmit }: Detail
           <div className="form-grid">
             <Input id="landlordName" label="Landlord name" value={draft.landlordName} onChange={(e) => update('landlordName', e.target.value)} error={errors.landlordName} placeholder="Full name" />
             <Input id="tenantName" label="Tenant name" value={draft.tenantName} onChange={(e) => update('tenantName', e.target.value)} error={errors.tenantName} placeholder="Full name" />
+            <Input className="document-name-input" id="documentName" label="Document name" value={draft.documentName} onChange={(e) => update('documentName', e.target.value)} error={errors.documentName} hint="Suggested from both party names; you can customize it." />
           </div>
         </Card>
 

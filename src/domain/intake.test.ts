@@ -26,7 +26,7 @@ describe('validateIntake', () => {
   })
 
   it('reports every blank field', () => {
-    expect(Object.keys(validateIntake(emptyIntakeDraft))).toHaveLength(11)
+    expect(Object.keys(validateIntake({ ...emptyIntakeDraft, documentName: '' }))).toHaveLength(12)
   })
 
   it('enforces numeric boundaries', () => {

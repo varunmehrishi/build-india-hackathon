@@ -23,7 +23,11 @@ function createSnapshot(invitedRole?: 'landlord' | 'tenant'): WorkflowSnapshotEn
 
 describe('workflow snapshots', () => {
   it('round-trips compressed Unicode agreement state', () => {
-    const original = createSnapshot('landlord')
+    const original: WorkflowSnapshotEnvelope = {
+      ...createSnapshot('landlord'),
+      documentName: 'कमल निवास lease',
+      documentNameCustomized: true,
+    }
     const result = decodeSnapshot(encodeSnapshot(original))
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.snapshot).toEqual(original)

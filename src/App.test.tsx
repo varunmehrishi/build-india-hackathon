@@ -87,10 +87,19 @@ describe('persistent multi-document journey', () => {
     await user.click(screen.getByRole('button', { name: 'Use demo details' }))
 
     expect(screen.getByLabelText('Tenant name')).toHaveValue('Meera Sharma')
+    expect(screen.getByLabelText('Document name')).toHaveValue('Arjun Rao & Meera Sharma')
     await user.click(screen.getByLabelText('Landlord'))
     expect(screen.getByLabelText('Landlord name')).toHaveValue('Meera Sharma')
     expect(screen.getByLabelText('Tenant name')).toHaveValue('Arjun Rao')
+    expect(screen.getByLabelText('Document name')).toHaveValue('Meera Sharma & Arjun Rao')
     expect(screen.getByText('You’re the landlord')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Document name'))
+    await user.type(screen.getByLabelText('Document name'), 'Indiranagar home lease')
+    await user.clear(screen.getByLabelText('Tenant name'))
+    await user.type(screen.getByLabelText('Tenant name'), 'Dev Rao')
+    expect(screen.getByLabelText('Document name')).toHaveValue('Indiranagar home lease')
+    expect(screen.getByRole('option', { name: 'Indiranagar home lease' })).toBeInTheDocument()
   })
 
   it('keeps multiple documents and switches back to an existing document', async () => {
@@ -133,6 +142,10 @@ describe('persistent multi-document journey', () => {
     const firstUser = await login()
     await completeDemoIntake(firstUser)
     await finalizeDocument(firstUser)
+    await firstUser.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByRole('heading', { name: 'Stamp duty' })
+    await firstUser.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByRole('heading', { name: 'Identity' })
     await firstUser.click(screen.getByRole('button', { name: 'Share' }))
     const inviteUrl = (screen.getByLabelText('Invite link') as HTMLTextAreaElement).value
 
@@ -142,11 +155,29 @@ describe('persistent multi-document journey', () => {
     window.history.replaceState(null, '', inviteUrl)
 
     render(<App />)
-    await login('987654321098', 'Finalized agreement')
+    await login('987654321098', 'Identity')
     expect(screen.getByRole('status')).toHaveTextContent('Shared agreement imported')
     expect(screen.getByText('You’re the landlord')).toBeInTheDocument()
     expect(window.location.hash).toBe('')
     expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toContain('Bengaluru')
+  })
+
+  it('executes the remaining steps while keeping pre-finalization steps locked', async () => {
+    render(<App />)
+    const user = await login()
+    await completeDemoIntake(user)
+    await finalizeDocument(user)
+
+    expect(screen.getByRole('button', { name: /5\. Review, locked/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
+    for (const heading of ['Stamp duty', 'Identity', 'Notary', 'eSign', 'Completion']) {
+      await user.click(screen.getByRole('button', { name: 'Continue' }))
+      await screen.findByRole('heading', { name: heading })
+      expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByRole('heading', { name: 'eSign' })).toBeInTheDocument()
   })
 
   it('logout preserves documents and the next login restores the active finalized view', async () => {

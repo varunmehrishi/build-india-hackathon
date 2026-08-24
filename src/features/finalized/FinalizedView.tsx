@@ -14,7 +14,7 @@ function roleLabel(role: PartyRole | undefined): string {
 export function FinalizedView({ agreement, localRole }: FinalizedViewProps) {
   const finalizedBy = agreement.finalizedBy ?? agreement.lastUpdatedBy ?? agreement.initiator
   return (
-    <main className="finalized-content" id="main-content">
+    <div className="finalized-content">
       <Card className="finalized-card">
         <div className="finalized-heading">
           <div>
@@ -63,6 +63,6 @@ export function FinalizedView({ agreement, localRole }: FinalizedViewProps) {
           </div>
         </section>
       </Card>
-    </main>
+    </div>
   )
 }

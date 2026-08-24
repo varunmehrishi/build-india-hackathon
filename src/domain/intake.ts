@@ -63,6 +63,7 @@ export const emptyIntakeDraft: IntakeDraft = {
   startDate: '',
   landlordName: '',
   tenantName: '',
+  documentName: 'New rent agreement',
 }
 
 export const demoIntakeDraft: IntakeDraft = {
@@ -77,6 +78,13 @@ export const demoIntakeDraft: IntakeDraft = {
   startDate: '2026-09-01',
   landlordName: 'Arjun Rao',
   tenantName: 'Meera Sharma',
+  documentName: 'Arjun Rao & Meera Sharma',
+}
+
+export function suggestDocumentName(landlordName: string, tenantName: string): string {
+  const landlord = landlordName.trim()
+  const tenant = tenantName.trim()
+  return landlord && tenant ? `${landlord} & ${tenant}` : 'New rent agreement'
 }
 
 const rentIntentPattern = /\b(rent|rental|lease|tenancy|landlord|tenant)\b/i
@@ -122,6 +130,9 @@ export function validateIntake(draft: IntakeDraft): IntakeErrors {
   if (draft.tenantName.trim().length < 2) {
     errors.tenantName = 'Enter the tenant’s name.'
   }
+  if (draft.documentName.trim().length < 2) {
+    errors.documentName = 'Enter a document name.'
+  }
 
   return errors
 }
@@ -150,7 +161,10 @@ export function applyIntakeDraft(
   }
 }
 
-export function intakeDraftFromAgreement(state: AgreementState): IntakeDraft {
+export function intakeDraftFromAgreement(
+  state: AgreementState,
+  documentName = suggestDocumentName(state.landlord.name, state.tenant.name),
+): IntakeDraft {
   return {
     initiator: state.initiator,
     state: state.property.state,
@@ -163,5 +177,6 @@ export function intakeDraftFromAgreement(state: AgreementState): IntakeDraft {
     startDate: state.startDate,
     landlordName: state.landlord.name,
     tenantName: state.tenant.name,
+    documentName,
   }
 }

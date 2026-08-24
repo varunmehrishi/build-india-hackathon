@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { createInitialAgreementState } from './demoData'
 import { demoIntakeDraft } from './intake'
-import { createWorkspace, importSnapshot, loadWorkspace, saveWorkspace } from './workspace'
+import {
+  LEGACY_WORKSPACE_STORAGE_KEY,
+  WORKSPACE_STORAGE_KEY,
+  createWorkspace,
+  importSnapshot,
+  loadWorkspace,
+  saveWorkspace,
+} from './workspace'
 
 describe('local workspace repository', () => {
   it('round-trips multiple documents and incomplete drafts', () => {
@@ -12,6 +19,7 @@ describe('local workspace repository', () => {
     workspace.documents[second.agreementId] = {
       agreement: second,
       intakeDraft: { ...demoIntakeDraft, city: 'Pune' },
+      documentNameCustomized: false,
       furthestStepIndex: 1,
       localRole: 'landlord',
       updatedAt: new Date().toISOString(),
@@ -46,10 +54,33 @@ describe('local workspace repository', () => {
     expect(result.activeDocumentId).toBe(imported.agreementId)
     expect(result.documents[imported.agreementId].localRole).toBe('landlord')
     expect(result.documents[imported.agreementId].agreement.finalizedBy).toBe('tenant')
+    expect(result.documents[imported.agreementId].intakeDraft.documentName).toBe('Arjun Rao & Meera Sharma')
+  })
+
+  it('migrates version-one documents with a party-based name', () => {
+    const current = createWorkspace()
+    const currentDocument = current.documents[current.activeDocumentId]
+    currentDocument.intakeDraft = { ...demoIntakeDraft }
+    const { documentName: _documentName, ...legacyDraft } = currentDocument.intakeDraft
+    const { documentNameCustomized: _customized, ...legacyDocument } = currentDocument
+    localStorage.removeItem(WORKSPACE_STORAGE_KEY)
+    localStorage.setItem(LEGACY_WORKSPACE_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      activeDocumentId: current.activeDocumentId,
+      documents: {
+        [current.activeDocumentId]: { ...legacyDocument, intakeDraft: legacyDraft },
+      },
+    }))
+
+    const migrated = loadWorkspace()
+    expect(migrated.version).toBe(2)
+    expect(migrated.documents[migrated.activeDocumentId].intakeDraft.documentName).toBe('Arjun Rao & Meera Sharma')
+    expect(migrated.documents[migrated.activeDocumentId].documentNameCustomized).toBe(false)
+    expect(localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY)).toBeNull()
   })
 
   it('replaces malformed storage with a usable workspace', () => {
-    localStorage.setItem('build-india-workspace-v1', '{bad json')
+    localStorage.setItem(LEGACY_WORKSPACE_STORAGE_KEY, '{bad json')
     const workspace = loadWorkspace()
     expect(workspace.documents[workspace.activeDocumentId]).toBeDefined()
   })
