@@ -22,6 +22,7 @@ export function Stepper({ steps, activeStepId, onSelectStep }: StepperProps) {
             type="button"
             className={['stepper-item', `is-${state}`].join(' ')}
             aria-current={state === 'current' ? 'step' : undefined}
+            aria-label={`${index + 1}. ${step.title}${state === 'current' ? ', current step' : ''}`}
             onClick={() => onSelectStep(step.id)}
           >
             <span className="stepper-index">{index + 1}</span>

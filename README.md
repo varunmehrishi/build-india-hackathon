@@ -26,4 +26,14 @@ npm run build
 ## Deployment
 
 The app is configured for a GitHub Pages project site at `/build-india-hackathon/`.
-The included workflow can publish the static `dist/` output to Pages once the repository is created on GitHub.
+
+To publish the current build to the repository's `gh-pages` branch:
+
+```bash
+npm run deploy
+```
+
+In the repository settings, configure Pages to deploy from the `gh-pages` branch and
+the repository root. The site will then be available at:
+
+<https://varunmehrishi.github.io/build-india-hackathon/>

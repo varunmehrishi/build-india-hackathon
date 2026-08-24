@@ -186,7 +186,7 @@ a {
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.55);
   text-align: left;
-  cursor: default;
+  cursor: pointer;
 }
 
 .stepper-item.is-current {
@@ -303,6 +303,13 @@ a {
   transform: translateY(-1px);
 }
 
+.btn:focus-visible,
+.stepper-item:focus-visible,
+.input:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.35);
+  outline-offset: 3px;
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -396,5 +403,16 @@ a {
 
   .hero-copy h1 {
     max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
