@@ -40,12 +40,12 @@ button { color: inherit; }
 .app-frame-locked { filter: blur(10px); user-select: none; pointer-events: none; }
 
 .site-header {
-  min-height: 72px;
+  min-height: 118px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 12px 0 24px;
+  padding: 8px 0 22px;
 }
 
 .brand {
@@ -60,7 +60,7 @@ button { color: inherit; }
   cursor: pointer;
 }
 
-.brand-logo { width: 58px; height: 58px; object-fit: contain; filter: drop-shadow(0 7px 12px rgba(10, 64, 130, .14)); }
+.brand-logo { width: 104px; height: 104px; object-fit: contain; filter: drop-shadow(0 9px 16px rgba(10, 64, 130, .16)); }
 
 .brand > span:last-child { display: grid; }
 .brand strong { font-size: 1rem; }
@@ -355,6 +355,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 @media (max-width: 640px) {
   .page { padding: 14px; }
   .site-header { align-items: flex-start; }
+  .brand-logo { width: 76px; height: 76px; }
   .header-actions .badge, .citizen-name { display: none; }
   .header-actions .btn { min-height: 38px; padding: 8px 11px; font-size: .76rem; }
   .brand small { display: none; }
