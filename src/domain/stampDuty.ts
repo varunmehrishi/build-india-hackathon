@@ -67,7 +67,7 @@ function createPaymentReference(role: PartyRole, paidAt: string): string {
   const compactTime = paidAt.replace(/\D/g, '').slice(0, 14)
   const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, '').slice(0, 6).toUpperCase()
     ?? Math.random().toString(36).slice(2, 8).toUpperCase()
-  return `BI-STAMP-${compactTime}-${role === 'landlord' ? 'LL' : 'TN'}-${suffix}`
+  return `SS-STAMP-${compactTime}-${role === 'landlord' ? 'LL' : 'TN'}-${suffix}`
 }
 
 export function recordStampDutyPayment(

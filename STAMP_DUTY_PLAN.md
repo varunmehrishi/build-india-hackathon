@@ -57,7 +57,7 @@ The active browser may pay only the contribution matching its stored landlord/te
 ## Simulated payment behavior
 
 - `Pay ₹X` enters a short local processing state and then succeeds deterministically.
-- Success creates a sample reference beginning with `BI-STAMP-` and an ISO timestamp.
+- Success creates a sample reference beginning with `SS-STAMP-` and an ISO timestamp.
 - Persist success immediately, increment the snapshot revision, and set `lastUpdatedBy` to the paying role.
 - Prevent duplicate payment.
 - Show a read-only receipt containing party, amount, reference, and timestamp.

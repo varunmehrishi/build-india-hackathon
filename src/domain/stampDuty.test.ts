@@ -38,16 +38,16 @@ describe('stamp-duty payments', () => {
   it('locks after payment, prevents duplicates, and completes only after required shares', () => {
     const agreement = createInitialAgreementState()
     agreement.stampDutyPayment = configureStampDutyPayment(agreement, 50, 'tenant')
-    const first = recordStampDutyPayment(agreement, 'tenant', '2026-08-25T10:00:00.000Z', 'BI-STAMP-FIRST')
+    const first = recordStampDutyPayment(agreement, 'tenant', '2026-08-25T10:00:00.000Z', 'SS-STAMP-FIRST')
     expect(first.locked).toBe(true)
     expect(isStampDutyComplete(first)).toBe(false)
     agreement.stampDutyPayment = first
     expect(() => configureStampDutyPayment(agreement, 100, 'landlord')).toThrow(/locked/i)
     expect(() => recordStampDutyPayment(agreement, 'tenant')).toThrow(/already/i)
 
-    const complete = recordStampDutyPayment(agreement, 'landlord', '2026-08-25T10:01:00.000Z', 'BI-STAMP-SECOND')
+    const complete = recordStampDutyPayment(agreement, 'landlord', '2026-08-25T10:01:00.000Z', 'SS-STAMP-SECOND')
     expect(isStampDutyComplete(complete)).toBe(true)
-    expect(complete.landlord.paymentReference).toBe('BI-STAMP-SECOND')
+    expect(complete.landlord.paymentReference).toBe('SS-STAMP-SECOND')
   })
 
   it('completes a 100/0 split after its only required payment', () => {

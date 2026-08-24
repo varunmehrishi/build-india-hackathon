@@ -60,18 +60,7 @@ button { color: inherit; }
   cursor: pointer;
 }
 
-.brand-mark {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: var(--accent);
-  color: white;
-  font: 700 0.8rem 'Inter', sans-serif;
-  letter-spacing: 0.08em;
-  box-shadow: 0 8px 20px rgba(18, 111, 97, 0.2);
-}
+.brand-logo { width: 58px; height: 58px; object-fit: contain; filter: drop-shadow(0 7px 12px rgba(10, 64, 130, .14)); }
 
 .brand > span:last-child { display: grid; }
 .brand strong { font-size: 1rem; }

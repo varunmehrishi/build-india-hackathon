@@ -162,7 +162,7 @@ describe('persistent multi-document journey', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Shared agreement imported')
     expect(screen.getByText('You’re the landlord')).toBeInTheDocument()
     expect(screen.getByText('Split locked')).toBeInTheDocument()
-    expect(screen.getByText(/BI-STAMP-/)).toBeInTheDocument()
+    expect(screen.getByText(/SS-STAMP-/)).toBeInTheDocument()
     expect(window.location.hash).toBe('')
     expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toContain('Bengaluru')
     await secondUser.click(screen.getByRole('button', { name: 'Pay ₹900' }))

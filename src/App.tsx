@@ -381,9 +381,9 @@ function App() {
         inert={authSession && !shareSource ? undefined : true}
       >
         <header className="site-header">
-          <button type="button" className="brand" onClick={resetWorkflow} aria-label="Build India home">
-            <span className="brand-mark" aria-hidden="true">BI</span>
-            <span><strong>Build India</strong><small>Legal journeys, simplified</small></span>
+          <button type="button" className="brand" onClick={resetWorkflow} aria-label="Saral Setu home">
+            <img className="brand-logo" src={`${import.meta.env.BASE_URL}saral-setu-logo.png`} alt="" />
+            <span><strong>Saral Setu</strong><small>Legal journeys, simplified</small></span>
           </button>
           <nav className="header-actions" aria-label="Demo controls">
             <Badge tone="accent">Hackathon demo</Badge>

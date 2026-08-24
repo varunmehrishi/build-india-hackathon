@@ -50,12 +50,12 @@ describe('workflow snapshots', () => {
       partial.agreement,
       'tenant',
       '2026-08-25T10:00:00.000Z',
-      'BI-STAMP-PERSISTED',
+      'SS-STAMP-PERSISTED',
     )
     const partialResult = decodeSnapshot(encodeSnapshot(partial))
     expect(partialResult.ok).toBe(true)
     if (partialResult.ok) {
-      expect(partialResult.snapshot.agreement.stampDutyPayment?.tenant.paymentReference).toBe('BI-STAMP-PERSISTED')
+      expect(partialResult.snapshot.agreement.stampDutyPayment?.tenant.paymentReference).toBe('SS-STAMP-PERSISTED')
     }
 
     const older = createSnapshot('tenant')

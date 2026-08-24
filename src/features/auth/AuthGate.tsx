@@ -105,7 +105,7 @@ export function AuthGate({ onAuthenticated, suggestedDisplayName = 'Meera Sharma
           <div className="message-icon" aria-hidden="true">M</div>
           <div className="message-copy">
             <strong>Messages · now</strong>
-            <span>Your Build India demo OTP is {DEMO_OTP}</span>
+            <span>Your Saral Setu demo OTP is {DEMO_OTP}</span>
           </div>
           <button type="button" className="message-prefill" onClick={prefillAndVerify}>
             Prefill from Messages

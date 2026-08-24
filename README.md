@@ -1,6 +1,6 @@
-# Build India Hackathon
+# Saral Setu
 
-Frontend-only React + TypeScript + Vite prototype for the rent-agreement hackathon MVP.
+Frontend-only React + TypeScript + Vite prototype for the Saral Setu rent-agreement hackathon MVP.
 
 ## What is in place
 
