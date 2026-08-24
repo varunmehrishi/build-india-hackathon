@@ -5,9 +5,10 @@ interface StepperProps {
   steps: readonly WorkflowStepConfig[]
   activeStepId: WorkflowStepConfig['id']
   onSelectStep: (stepId: WorkflowStepConfig['id']) => void
+  maxSelectableIndex?: number
 }
 
-export function Stepper({ steps, activeStepId, onSelectStep }: StepperProps) {
+export function Stepper({ steps, activeStepId, onSelectStep, maxSelectableIndex }: StepperProps) {
   const activeIndex = steps.findIndex((step) => step.id === activeStepId)
 
   return (
@@ -15,6 +16,7 @@ export function Stepper({ steps, activeStepId, onSelectStep }: StepperProps) {
       {steps.map((step, index) => {
         const state =
           index < activeIndex ? 'done' : index === activeIndex ? 'current' : 'todo'
+        const isLocked = maxSelectableIndex !== undefined && index > maxSelectableIndex
 
         return (
           <button
@@ -22,7 +24,8 @@ export function Stepper({ steps, activeStepId, onSelectStep }: StepperProps) {
             type="button"
             className={['stepper-item', `is-${state}`].join(' ')}
             aria-current={state === 'current' ? 'step' : undefined}
-            aria-label={`${index + 1}. ${step.title}${state === 'current' ? ', current step' : ''}`}
+            aria-label={`${index + 1}. ${step.title}${state === 'current' ? ', current step' : ''}${isLocked ? ', locked' : ''}`}
+            disabled={isLocked}
             onClick={() => onSelectStep(step.id)}
           >
             <span className="stepper-index">{index + 1}</span>
@@ -31,7 +34,7 @@ export function Stepper({ steps, activeStepId, onSelectStep }: StepperProps) {
               <span className="stepper-title">{step.title}</span>
             </span>
             <Badge tone={state === 'done' ? 'success' : state === 'current' ? 'accent' : 'neutral'}>
-              {state === 'done' ? 'Done' : state === 'current' ? 'Now' : 'Next'}
+              {isLocked ? 'Locked' : state === 'done' ? 'Done' : state === 'current' ? 'Now' : 'Next'}
             </Badge>
           </button>
         )

@@ -23,7 +23,14 @@ export interface PropertyDetails {
   address: string
   city: string
   state: string
+  propertyType: PropertyType
 }
+
+export type PropertyType =
+  | 'residential-apartment'
+  | 'independent-house'
+  | 'builder-floor'
+  | 'other-residential'
 
 export interface Clause {
   id: string
@@ -35,6 +42,8 @@ export interface Clause {
 
 export interface AgreementState {
   workflowStep: WorkflowStep
+  intentText: string
+  intakeCompleted: boolean
   initiator: 'landlord' | 'tenant'
   property: PropertyDetails
   monthlyRent: number
@@ -54,6 +63,23 @@ export interface AgreementState {
   stampCompleted: boolean
   notarized: boolean
 }
+
+export interface IntakeDraft {
+  initiator: '' | AgreementState['initiator']
+  state: string
+  city: string
+  address: string
+  propertyType: '' | PropertyType
+  monthlyRent: string
+  securityDeposit: string
+  durationMonths: string
+  startDate: string
+  landlordName: string
+  tenantName: string
+}
+
+export type IntakeField = keyof IntakeDraft
+export type IntakeErrors = Partial<Record<IntakeField, string>>
 
 export interface WorkflowStepConfig {
   id: WorkflowStep

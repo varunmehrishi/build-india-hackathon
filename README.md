@@ -1,13 +1,15 @@
 # Build India Hackathon
 
-Frontend-only React + TypeScript + Vite scaffold for the rent-agreement hackathon MVP.
+Frontend-only React + TypeScript + Vite prototype for the rent-agreement hackathon MVP.
 
 ## What is in place
 
 - GitHub Pages-ready Vite base path.
 - Shared UI primitives.
 - Workflow state and demo data.
-- Placeholder screens for every journey step.
+- Simulated local Aadhaar OTP login with an encrypted synthetic identifier.
+- Intent routing and a validated, editable tenancy-details intake.
+- Placeholder screens for the remaining journey steps.
 - Reset Demo control.
 
 ## Local development
@@ -21,6 +23,13 @@ npm run dev
 
 ```bash
 npm run build
+```
+
+## Test
+
+```bash
+npm run test
+npm run lint
 ```
 
 ## Deployment
