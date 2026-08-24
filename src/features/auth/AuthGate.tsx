@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import {
-  DEMO_AADHAAR_DIGITS,
   DEMO_OTP,
-  encryptSyntheticIdentifier,
+  encryptAadhaar,
   type DemoAuthSession,
 } from '../../domain/auth'
 
 interface AuthGateProps {
   onAuthenticated: (session: DemoAuthSession) => void
+  suggestedDisplayName?: string
 }
 
 function formatAadhaar(value: string): string {
@@ -19,7 +19,7 @@ function formatAadhaar(value: string): string {
     .replace(/(\d{4})(?=\d)/g, '$1 ')
 }
 
-export function AuthGate({ onAuthenticated }: AuthGateProps) {
+export function AuthGate({ onAuthenticated, suggestedDisplayName = 'Meera Sharma' }: AuthGateProps) {
   const [identifier, setIdentifier] = useState('')
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
@@ -53,8 +53,8 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
   function sendOtp(event: React.FormEvent) {
     event.preventDefault()
     const digits = identifier.replace(/\D/g, '')
-    if (digits !== DEMO_AADHAAR_DIGITS) {
-      setError('Use the synthetic demo Aadhaar number shown below. Do not enter a real number.')
+    if (digits.length !== 12) {
+      setError('Enter a complete 12-digit Aadhaar number.')
       return
     }
     setError('')
@@ -70,12 +70,17 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
     setError('')
     setIsVerifying(true)
     try {
-      const encryptedIdentifier = await encryptSyntheticIdentifier(DEMO_AADHAAR_DIGITS)
+      const aadhaarDigits = identifier.replace(/\D/g, '')
+      const encryptedAadhaar = await encryptAadhaar(aadhaarDigits)
+      setIdentifier('')
+      setOtp('')
       onAuthenticated({
-        version: 1,
+        version: 2,
         authenticated: true,
-        displayName: 'Demo Citizen',
-        encryptedIdentifier,
+        participantId: crypto.randomUUID(),
+        displayName: suggestedDisplayName,
+        roleBindings: [],
+        encryptedAadhaar,
       })
     } catch {
       setError('Your browser could not create the local encrypted demo session. Please try again.')
@@ -129,13 +134,13 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
           <form onSubmit={sendOtp} className="auth-form" noValidate>
             <Input
               id="demo-aadhaar"
-              label="Demo Aadhaar number"
+              label="Aadhaar number"
               value={identifier}
               onChange={(event) => setIdentifier(formatAadhaar(event.target.value))}
               inputMode="numeric"
               autoComplete="off"
-              placeholder="0000 0000 0000"
-              hint="Use 0000 0000 0000 — a deliberately invalid synthetic number."
+              placeholder="XXXX XXXX XXXX"
+              hint="Any 12-digit number is accepted for this local simulation."
               error={error || undefined}
             />
             <Button type="submit">Send OTP</Button>
@@ -171,8 +176,9 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
         )}
 
         <p className="auth-disclaimer">
-          Static hackathon simulation only. Entered values are processed in this browser and are
-          not transmitted. This experience is not connected to UIDAI or any government service.
+          Static hackathon simulation only. The number is encrypted in this browser and is never
+          included in shared agreement links. This experience is not connected to UIDAI or any
+          government service.
         </p>
       </div>
     </div>

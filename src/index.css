@@ -79,6 +79,35 @@ button { color: inherit; }
 .header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
 .citizen-name { color: var(--muted); font-size: 0.86rem; font-weight: 600; }
 
+.bootstrap-loading {
+  min-height: calc(100vh - 44px);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.app-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 14px;
+  border: 1px solid #bfded5;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.app-notice button {
+  border: 0;
+  background: transparent;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
 h1, h2, p { margin-top: 0; }
 h1, h2 { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.025em; }
 h1 { margin-bottom: 14px; font-size: clamp(2.3rem, 5vw, 4.7rem); line-height: 0.98; }
@@ -179,6 +208,59 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .message-copy span { color: var(--muted); }
 .message-prefill { grid-column: 2; width: max-content; border: 0; padding: 0; background: transparent; color: #1767c4; font-size: 0.8rem; font-weight: 750; cursor: pointer; }
 
+.profile-menu { position: relative; }
+.profile-trigger {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: rgba(255, 254, 251, 0.82);
+  font-size: 0.82rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+.profile-avatar { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: white; }
+.profile-popover {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 9px);
+  right: 0;
+  width: min(330px, calc(100vw - 28px));
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(16, 31, 27, 0.48);
+  backdrop-filter: blur(7px);
+}
+.share-dialog {
+  width: min(600px, 100%);
+  display: grid;
+  gap: 20px;
+  padding: clamp(22px, 4vw, 32px);
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 26px;
+  background: var(--surface);
+  box-shadow: 0 30px 90px rgba(9, 27, 22, 0.3);
+}
+.share-warning { display: grid; gap: 5px; padding: 14px; border: 1px solid #ead59a; border-radius: 14px; background: #fff8df; color: #755019; font-size: .8rem; line-height: 1.45; }
+.share-link { width: 100%; resize: none; border: 1px solid var(--border-strong); border-radius: 13px; padding: 12px; background: #f6f8f5; color: var(--muted); font: .72rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
 .details-content { margin-top: 25px; gap: 25px; }
 .compact-progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; color: var(--muted); font-size: 0.78rem; }
 .compact-progress strong { color: var(--text); }
@@ -224,7 +306,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .placeholder-list { margin: 0; padding-left: 18px; display: grid; gap: 7px; color: var(--muted); }
 .journey-actions { justify-content: space-between; }
 
-.btn:focus-visible, .brand:focus-visible, .workflow-card:focus-visible, .stepper-item:focus-visible, .message-prefill:focus-visible { outline: 3px solid rgba(18, 111, 97, 0.32); outline-offset: 3px; }
+.btn:focus-visible, .brand:focus-visible, .workflow-card:focus-visible, .stepper-item:focus-visible, .message-prefill:focus-visible, .profile-trigger:focus-visible { outline: 3px solid rgba(18, 111, 97, 0.32); outline-offset: 3px; }
 
 @media (max-width: 850px) {
   .workflow-card-grid, .journey-layout { grid-template-columns: 1fr; }
@@ -239,6 +321,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .header-actions .badge, .citizen-name { display: none; }
   .header-actions .btn { min-height: 38px; padding: 8px 11px; font-size: .76rem; }
   .brand small { display: none; }
+  .profile-trigger > span:nth-child(2) { display: none; }
   .focused-content { margin-top: 30px; gap: 32px; }
   .workflow-card-grid, .form-grid { grid-template-columns: 1fr; }
   .workflow-card { grid-template-columns: auto 1fr; }

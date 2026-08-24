@@ -149,3 +149,19 @@ export function applyIntakeDraft(
     workflowStep: 'requirements',
   }
 }
+
+export function intakeDraftFromAgreement(state: AgreementState): IntakeDraft {
+  return {
+    initiator: state.initiator,
+    state: state.property.state,
+    city: state.property.city,
+    address: state.property.address,
+    propertyType: state.property.propertyType,
+    monthlyRent: String(state.monthlyRent),
+    securityDeposit: String(state.securityDeposit),
+    durationMonths: String(state.durationMonths),
+    startDate: state.startDate,
+    landlordName: state.landlord.name,
+    tenantName: state.tenant.name,
+  }
+}

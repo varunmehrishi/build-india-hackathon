@@ -11,6 +11,8 @@ export type WorkflowStep =
   | 'sign'
   | 'complete'
 
+export type PartyRole = 'landlord' | 'tenant'
+
 export interface Party {
   id: 'landlord' | 'tenant'
   name: string
@@ -41,10 +43,13 @@ export interface Clause {
 }
 
 export interface AgreementState {
+  agreementId: string
+  snapshotRevision: number
+  lastUpdatedBy?: PartyRole
   workflowStep: WorkflowStep
   intentText: string
   intakeCompleted: boolean
-  initiator: 'landlord' | 'tenant'
+  initiator: PartyRole
   property: PropertyDetails
   monthlyRent: number
   securityDeposit: number

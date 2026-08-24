@@ -1,5 +1,9 @@
 import type { AgreementState, WorkflowStepConfig } from './types'
 
+function createAgreementId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `agreement-${Date.now()}`
+}
+
 export const workflowSteps: readonly WorkflowStepConfig[] = [
   {
     id: 'intent',
@@ -128,6 +132,8 @@ export const workflowStepOrder = workflowSteps.map((step) => step.id)
 
 export function createInitialAgreementState(): AgreementState {
   return {
+    agreementId: createAgreementId(),
+    snapshotRevision: 0,
     workflowStep: 'intent',
     intentText: '',
     intakeCompleted: false,

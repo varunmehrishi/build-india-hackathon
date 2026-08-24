@@ -1,7 +1,9 @@
 import '@testing-library/jest-dom/vitest'
+import 'fake-indexeddb/auto'
 import { cleanup } from '@testing-library/react'
 import { webcrypto } from 'node:crypto'
 import { afterEach } from 'vitest'
+import { clearAuthSession } from '../domain/auth'
 
 Object.defineProperty(globalThis, 'crypto', {
   configurable: true,
@@ -20,7 +22,9 @@ const storage: Storage = {
 
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
+  await clearAuthSession()
   localStorage.clear()
+  window.history.replaceState(null, '', '/build-india-hackathon/')
 })
