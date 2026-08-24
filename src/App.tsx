@@ -12,171 +12,225 @@ import {
   saveAuthSession,
   type DemoAuthSession,
 } from './domain/auth'
-import { createInitialAgreementState, workflowStepOrder, workflowSteps } from './domain/demoData'
+import { workflowStepOrder, workflowSteps } from './domain/demoData'
+import { applyIntakeDraft } from './domain/intake'
+import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
+import type { IntakeDraft, WorkflowStep } from './domain/types'
 import {
-  applyIntakeDraft,
-  emptyIntakeDraft,
-  intakeDraftFromAgreement,
-} from './domain/intake'
-import {
-  replaceSnapshotUrl,
-  snapshotFromLocation,
-  type WorkflowSnapshotEnvelope,
-} from './domain/snapshot'
-import type { AgreementState, IntakeDraft, PartyRole, WorkflowStep } from './domain/types'
+  activeDocument,
+  addNewDocument,
+  documentLabel,
+  importSnapshot,
+  loadWorkspace,
+  replaceActiveWithNewDocument,
+  saveWorkspace,
+  updateDocument,
+  type LocalWorkspace,
+  type StoredDocument,
+} from './domain/workspace'
 import { AuthGate } from './features/auth/AuthGate'
 import { ProfileMenu } from './features/auth/ProfileMenu'
+import { FinalizedView } from './features/finalized/FinalizedView'
 import { DetailsScreen } from './features/intake/DetailsScreen'
 import { IntentScreen } from './features/intake/IntentScreen'
 import { ShareDialog } from './features/sharing/ShareDialog'
 
 type AuthState = DemoAuthSession | null | undefined
 
-function invitedPartyName(snapshot: WorkflowSnapshotEnvelope | null): string | undefined {
+function roleName(snapshot: WorkflowSnapshotEnvelope | null): string | undefined {
   if (!snapshot?.invitedRole) return undefined
   return snapshot.agreement[snapshot.invitedRole].name || undefined
 }
 
+function storedRoleName(document: StoredDocument, role: 'landlord' | 'tenant'): string | undefined {
+  const agreementName = document.agreement[role].name.trim()
+  const draftName = (role === 'landlord'
+    ? document.intakeDraft.landlordName
+    : document.intakeDraft.tenantName).trim()
+  return agreementName || draftName || undefined
+}
+
 function App() {
   const initialShare = useMemo(() => snapshotFromLocation(), [])
-  const [pendingSnapshot, setPendingSnapshot] = useState<WorkflowSnapshotEnvelope | null>(
-    initialShare?.ok ? initialShare.snapshot : null,
-  )
-  const [notice, setNotice] = useState(
-    initialShare && !initialShare.ok ? initialShare.error : '',
-  )
+  const [workspace, setWorkspace] = useState<LocalWorkspace>(() => loadWorkspace())
+  const [notice, setNotice] = useState(initialShare && !initialShare.ok ? initialShare.error : '')
   const [authSession, setAuthSession] = useState<AuthState>(undefined)
-  const [state, setState] = useState<AgreementState>(() => createInitialAgreementState())
-  const [draft, setDraft] = useState<IntakeDraft>(() => ({ ...emptyIntakeDraft }))
-  const [furthestStepIndex, setFurthestStepIndex] = useState(0)
-  const [isShareOpen, setIsShareOpen] = useState(false)
+  const [shareSource, setShareSource] = useState<StoredDocument | null>(null)
 
+  const document = activeDocument(workspace)
+  const state = document.agreement
+  const draft = document.intakeDraft
+  const furthestStepIndex = document.furthestStepIndex
   const activeIndex = workflowStepOrder.indexOf(state.workflowStep)
   const activeStep = workflowSteps[activeIndex]
-  const activeRole = authSession
-    ? roleForAgreement(authSession, state.agreementId) ?? (draft.initiator || undefined)
-    : undefined
+  const activeRole = document.localRole
+    ?? (authSession ? roleForAgreement(authSession, state.agreementId) : undefined)
+    ?? (draft.initiator || undefined)
 
   useEffect(() => {
     let cancelled = false
     void restoreAuthSession().then((restored) => {
       if (cancelled) return
-      if (restored && pendingSnapshot) {
-        importSnapshot(restored, pendingSnapshot)
-      } else {
-        setAuthSession(restored)
+      let nextWorkspace = workspace
+      if (initialShare?.ok) {
+        nextWorkspace = importSnapshot(workspace, initialShare.snapshot)
+        saveWorkspace(nextWorkspace)
+        setWorkspace(nextWorkspace)
+        setNotice(`Shared agreement imported · revision ${initialShare.snapshot.agreement.snapshotRevision}`)
       }
-      if (initialShare && !initialShare.ok) replaceSnapshotUrl(null)
+      if (initialShare) replaceSnapshotUrl(null)
+
+      if (restored) {
+        const current = activeDocument(nextWorkspace)
+        if (current.localRole) {
+          const name = storedRoleName(current, current.localRole)
+          restored = bindRole(
+            { ...restored, displayName: name || restored.displayName },
+            current.agreement.agreementId,
+            current.localRole,
+          )
+          saveAuthSession(restored)
+        }
+      }
+      setAuthSession(restored)
     })
     return () => { cancelled = true }
-    // Bootstrap exactly once from the URL and local vault.
+    // Bootstrap once from browser storage and the incoming URL package.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (!state.intakeCompleted || pendingSnapshot) return
-    try {
-      replaceSnapshotUrl({
-        codecVersion: 1,
-        agreement: state,
-        furthestStepIndex,
-      })
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'The agreement URL could not be updated.')
-    }
-  }, [state, furthestStepIndex, pendingSnapshot])
+  function persistWorkspace(next: LocalWorkspace) {
+    saveWorkspace(next)
+    setWorkspace(next)
+  }
+
+  function mutateWorkspace(transform: (current: LocalWorkspace) => LocalWorkspace) {
+    setWorkspace((current) => {
+      const next = transform(current)
+      saveWorkspace(next)
+      return next
+    })
+  }
+
+  function mutateActiveDocument(updater: (current: StoredDocument) => StoredDocument) {
+    mutateWorkspace((current) => updateDocument(current, current.activeDocumentId, updater))
+  }
 
   function persistSession(session: DemoAuthSession) {
     saveAuthSession(session)
     setAuthSession(session)
   }
 
-  function importSnapshot(session: DemoAuthSession, snapshot: WorkflowSnapshotEnvelope) {
-    const role = snapshot.invitedRole
-      ?? roleForAgreement(session, snapshot.agreement.agreementId)
-      ?? snapshot.agreement.initiator
-    const sharedName = snapshot.agreement[role].name.trim()
-    const namedSession = { ...session, displayName: sharedName || session.displayName }
-    const boundSession = bindRole(namedSession, snapshot.agreement.agreementId, role)
-    saveAuthSession(boundSession)
-    setAuthSession(boundSession)
-    setState(snapshot.agreement)
-    setDraft(intakeDraftFromAgreement(snapshot.agreement))
-    setFurthestStepIndex(snapshot.furthestStepIndex)
-    setPendingSnapshot(null)
-    setNotice(`Shared agreement loaded · revision ${snapshot.agreement.snapshotRevision}`)
-  }
-
   function resetWorkflow() {
-    setState(createInitialAgreementState())
-    setDraft({ ...emptyIntakeDraft })
-    setFurthestStepIndex(0)
-    setPendingSnapshot(null)
-    setNotice('')
-    setIsShareOpen(false)
+    persistWorkspace(replaceActiveWithNewDocument(workspace))
+    setNotice('Active document reset.')
+    setShareSource(null)
     replaceSnapshotUrl(null)
   }
 
+  function createDocument() {
+    persistWorkspace(addNewDocument(workspace))
+    setNotice('New document created.')
+    setShareSource(null)
+  }
+
+  function selectDocument(agreementId: string) {
+    const selected = workspace.documents[agreementId]
+    if (!selected) return
+    persistWorkspace({ ...workspace, activeDocumentId: agreementId })
+    if (authSession && selected.localRole) {
+      const name = storedRoleName(selected, selected.localRole)
+      persistSession(bindRole(
+        { ...authSession, displayName: name || authSession.displayName },
+        agreementId,
+        selected.localRole,
+      ))
+    }
+    setNotice('')
+    setShareSource(null)
+  }
+
   function authenticate(session: DemoAuthSession) {
-    if (pendingSnapshot) importSnapshot(session, pendingSnapshot)
-    else persistSession(session)
+    let nextSession = session
+    if (document.localRole) {
+      const name = storedRoleName(document, document.localRole)
+      nextSession = bindRole(
+        { ...session, displayName: name || session.displayName },
+        state.agreementId,
+        document.localRole,
+      )
+    }
+    persistSession(nextSession)
   }
 
   async function logout() {
     await clearAuthSession()
-    resetWorkflow()
+    setShareSource(null)
     setAuthSession(null)
   }
 
   function updateWorkflowStep(step: WorkflowStep) {
+    if (state.finalized) return
     const nextIndex = workflowStepOrder.indexOf(step)
     if (nextIndex > furthestStepIndex) return
-    setState((current) => ({
+    mutateActiveDocument((current) => ({
       ...current,
-      workflowStep: step,
-      snapshotRevision: current.intakeCompleted ? current.snapshotRevision + 1 : current.snapshotRevision,
-      lastUpdatedBy: current.intakeCompleted ? activeRole : current.lastUpdatedBy,
+      agreement: {
+        ...current.agreement,
+        workflowStep: step,
+        snapshotRevision: current.agreement.intakeCompleted
+          ? current.agreement.snapshotRevision + 1
+          : current.agreement.snapshotRevision,
+        lastUpdatedBy: current.agreement.intakeCompleted ? activeRole : current.agreement.lastUpdatedBy,
+      },
     }))
   }
 
   function moveStep(offset: number) {
+    if (state.finalized) return
     const nextIndex = Math.max(0, Math.min(workflowSteps.length - 1, activeIndex + offset))
-    setFurthestStepIndex((current) => Math.max(current, nextIndex))
-    setState((current) => ({
+    mutateActiveDocument((current) => ({
       ...current,
-      workflowStep: workflowSteps[nextIndex].id,
-      snapshotRevision: current.intakeCompleted ? current.snapshotRevision + 1 : current.snapshotRevision,
-      lastUpdatedBy: current.intakeCompleted ? activeRole : current.lastUpdatedBy,
+      furthestStepIndex: Math.max(current.furthestStepIndex, nextIndex),
+      agreement: {
+        ...current.agreement,
+        workflowStep: workflowSteps[nextIndex].id,
+        snapshotRevision: current.agreement.intakeCompleted
+          ? current.agreement.snapshotRevision + 1
+          : current.agreement.snapshotRevision,
+        lastUpdatedBy: current.agreement.intakeCompleted ? activeRole : current.agreement.lastUpdatedBy,
+      },
     }))
   }
 
   function beginRentWorkflow(intentText: string) {
-    setState((current) => ({ ...current, intentText, workflowStep: 'details' }))
-    setFurthestStepIndex((current) => Math.max(current, 1))
+    mutateActiveDocument((current) => ({
+      ...current,
+      furthestStepIndex: Math.max(current.furthestStepIndex, 1),
+      agreement: { ...current.agreement, intentText, workflowStep: 'details' },
+    }))
   }
 
   function updateProfileName(displayName: string) {
     if (!authSession) return
     persistSession({ ...authSession, displayName })
+    if (state.finalized || !activeRole) return
 
-    if (state.workflowStep === 'details' || !state.intakeCompleted) {
-      const role = draft.initiator
-      if (role) {
-        const field = role === 'landlord' ? 'landlordName' : 'tenantName'
-        setDraft((current) => ({ ...current, [field]: displayName }))
-      }
-      return
-    }
-
-    const role = roleForAgreement(authSession, state.agreementId)
-    if (role) {
-      setState((current) => ({
+    mutateActiveDocument((current) => {
+      const field = activeRole === 'landlord' ? 'landlordName' : 'tenantName'
+      return {
         ...current,
-        [role]: { ...current[role], name: displayName },
-        snapshotRevision: current.snapshotRevision + 1,
-        lastUpdatedBy: role,
-      }))
-    }
+        intakeDraft: { ...current.intakeDraft, [field]: displayName },
+        agreement: current.agreement.intakeCompleted
+          ? {
+              ...current.agreement,
+              [activeRole]: { ...current.agreement[activeRole], name: displayName },
+              snapshotRevision: current.agreement.snapshotRevision + 1,
+              lastUpdatedBy: activeRole,
+            }
+          : current.agreement,
+      }
+    })
   }
 
   function updateDraft(nextDraft: IntakeDraft) {
@@ -196,7 +250,12 @@ function App() {
       adjusted[selectedField] = authSession.displayName
     }
 
-    setDraft(adjusted)
+    mutateActiveDocument((current) => ({
+      ...current,
+      intakeDraft: adjusted,
+      localRole: nextRole || current.localRole,
+    }))
+
     if (authSession && nextRole) {
       const selectedName = nextRole === 'landlord' ? adjusted.landlordName : adjusted.tenantName
       if (selectedName.trim().length >= 2 && selectedName.trim() !== authSession.displayName) {
@@ -208,30 +267,60 @@ function App() {
   function submitDetails(nextDraft: IntakeDraft) {
     const role = nextDraft.initiator || 'tenant'
     const completed = applyIntakeDraft(state, nextDraft)
-    const nextState: AgreementState = {
-      ...completed,
-      snapshotRevision: state.snapshotRevision + 1,
-      lastUpdatedBy: role,
+    mutateActiveDocument((current) => ({
+      ...current,
+      intakeDraft: nextDraft,
+      localRole: role,
+      furthestStepIndex: Math.max(current.furthestStepIndex, 2),
+      agreement: {
+        ...completed,
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: role,
+      },
+    }))
+    if (authSession) persistSession(bindRole(authSession, state.agreementId, role))
+  }
+
+  function finalizeDocument() {
+    if (!activeRole || !state.intakeCompleted || state.finalized) return
+    const finalizedIndex = workflowStepOrder.indexOf('finalized')
+    mutateActiveDocument((current) => ({
+      ...current,
+      furthestStepIndex: Math.max(current.furthestStepIndex, finalizedIndex),
+      agreement: {
+        ...current.agreement,
+        workflowStep: 'finalized',
+        finalized: true,
+        finalizedBy: activeRole,
+        finalizedAt: new Date().toISOString(),
+        [activeRole]: { ...current.agreement[activeRole], approvedAgreement: true },
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: activeRole,
+      },
+    }))
+    setNotice(`Document finalized by the ${activeRole}.`)
+  }
+
+  function openShare() {
+    const storedWorkspace = loadWorkspace()
+    const storedDocument = storedWorkspace.documents[state.agreementId]
+    if (!storedDocument?.agreement.finalized) {
+      setNotice('Finalize the document before sharing it.')
+      return
     }
-    setState(nextState)
-    setFurthestStepIndex((current) => Math.max(current, 2))
-    if (authSession) persistSession(bindRole(authSession, nextState.agreementId, role))
+    setShareSource(storedDocument)
   }
 
   if (authSession === undefined) {
-    return (
-      <PageContainer>
-        <div className="bootstrap-loading" role="status">Opening your local workspace…</div>
-      </PageContainer>
-    )
+    return <PageContainer><div className="bootstrap-loading" role="status">Opening your local workspace…</div></PageContainer>
   }
 
   return (
     <PageContainer>
       <div
         className={authSession ? 'app-frame' : 'app-frame app-frame-locked'}
-        aria-hidden={authSession && !isShareOpen ? undefined : true}
-        inert={authSession && !isShareOpen ? undefined : true}
+        aria-hidden={authSession && !shareSource ? undefined : true}
+        inert={authSession && !shareSource ? undefined : true}
       >
         <header className="site-header">
           <button type="button" className="brand" onClick={resetWorkflow} aria-label="Build India home">
@@ -240,9 +329,14 @@ function App() {
           </button>
           <nav className="header-actions" aria-label="Demo controls">
             <Badge tone="accent">Hackathon demo</Badge>
-            {state.intakeCompleted && state.workflowStep !== 'details' && authSession && activeRole ? (
-              <Button variant="ghost" onClick={() => setIsShareOpen(true)}>Share</Button>
+            {authSession ? (
+              <select className="document-select" aria-label="Active document" value={workspace.activeDocumentId} onChange={(event) => selectDocument(event.target.value)}>
+                {Object.values(workspace.documents).map((item) => <option key={item.agreement.agreementId} value={item.agreement.agreementId}>{documentLabel(item)}</option>)}
+              </select>
             ) : null}
+            {authSession ? <Button variant="ghost" onClick={createDocument}>New document</Button> : null}
+            {authSession && activeRole ? <Badge tone="success">You’re the {activeRole}</Badge> : null}
+            {state.finalized && authSession && activeRole ? <Button variant="ghost" onClick={openShare}>Share</Button> : null}
             <Button variant="ghost" onClick={resetWorkflow}>Reset Demo</Button>
             {authSession ? <ProfileMenu name={authSession.displayName} onSave={updateProfileName} /> : null}
             {authSession ? <Button variant="secondary" onClick={() => void logout()}>Logout</Button> : null}
@@ -251,38 +345,24 @@ function App() {
 
         {notice ? <div className="app-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div> : null}
 
-        {state.workflowStep === 'intent' ? (
+        {state.finalized ? (
+          <FinalizedView agreement={state} localRole={activeRole} />
+        ) : state.workflowStep === 'intent' ? (
           <IntentScreen initialValue={state.intentText} onContinue={beginRentWorkflow} />
         ) : state.workflowStep === 'details' ? (
-          <DetailsScreen
-            draft={draft}
-            onDraftChange={updateDraft}
-            onBack={() => updateWorkflowStep('intent')}
-            onSubmit={submitDetails}
-          />
+          <DetailsScreen draft={draft} onDraftChange={updateDraft} onBack={() => updateWorkflowStep('intent')} onSubmit={submitDetails} />
         ) : (
           <div className="journey-layout">
             <aside className="sidebar">
               <Card>
-                <div className="section-heading">
-                  <p className="eyebrow">Journey</p>
-                  <h2>Workflow steps</h2>
-                </div>
-                <Stepper
-                  steps={workflowSteps}
-                  activeStepId={state.workflowStep}
-                  onSelectStep={updateWorkflowStep}
-                  maxSelectableIndex={furthestStepIndex}
-                />
+                <div className="section-heading"><p className="eyebrow">Journey</p><h2>Steps</h2></div>
+                <Stepper steps={workflowSteps} activeStepId={state.workflowStep} onSelectStep={updateWorkflowStep} maxSelectableIndex={furthestStepIndex} />
               </Card>
             </aside>
 
             <main className="content" id="main-content">
               <Card className="stage-card">
-                <div className="section-heading">
-                  <p className="eyebrow">{activeStep.kicker}</p>
-                  <h1>{activeStep.title}</h1>
-                </div>
+                <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>
                 <p className="stage-description">{activeStep.description}</p>
                 <div className="transaction-summary">
                   <span><small>Transaction</small><strong>{state.durationMonths}-month residential tenancy</strong></span>
@@ -291,14 +371,12 @@ function App() {
                 </div>
                 <div className="placeholder-panel">
                   <p className="placeholder-title">Coming in the next milestone</p>
-                  <ul className="placeholder-list">
-                    {activeStep.placeholderPoints.map((point) => <li key={point}>{point}</li>)}
-                  </ul>
+                  <ul className="placeholder-list">{activeStep.placeholderPoints.map((point) => <li key={point}>{point}</li>)}</ul>
                 </div>
               </Card>
               <div className="journey-actions">
                 <Button variant="ghost" onClick={() => moveStep(-1)}>Back</Button>
-                <Button onClick={() => moveStep(1)} disabled={activeIndex === workflowSteps.length - 1}>Continue</Button>
+                {state.workflowStep === 'review' ? <Button onClick={finalizeDocument}>Finalize document</Button> : <Button onClick={() => moveStep(1)}>Continue</Button>}
               </div>
             </main>
           </div>
@@ -308,17 +386,12 @@ function App() {
       {!authSession ? (
         <AuthGate
           onAuthenticated={authenticate}
-          suggestedDisplayName={invitedPartyName(pendingSnapshot)}
+          suggestedDisplayName={roleName(initialShare?.ok ? initialShare.snapshot : null) ?? (activeRole ? storedRoleName(document, activeRole) : undefined)}
         />
       ) : null}
 
-      {isShareOpen && authSession && activeRole ? (
-        <ShareDialog
-          agreement={state}
-          furthestStepIndex={furthestStepIndex}
-          activeRole={activeRole as PartyRole}
-          onClose={() => setIsShareOpen(false)}
-        />
+      {shareSource && authSession && activeRole ? (
+        <ShareDialog agreement={shareSource.agreement} furthestStepIndex={shareSource.furthestStepIndex} activeRole={activeRole} onClose={() => setShareSource(null)} />
       ) : null}
     </PageContainer>
   )

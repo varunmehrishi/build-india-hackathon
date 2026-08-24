@@ -80,7 +80,7 @@ function isClause(value: unknown): boolean {
   return typeof clause.id === 'string' && typeof clause.title === 'string' && typeof clause.text === 'string'
 }
 
-function isAgreementState(value: unknown): value is AgreementState {
+export function isAgreementState(value: unknown): value is AgreementState {
   if (!value || typeof value !== 'object') return false
   const state = value as Partial<AgreementState>
   return (
@@ -114,6 +114,8 @@ function isAgreementState(value: unknown): value is AgreementState {
     typeof state.requirements.notarizationOptional === 'boolean' &&
     typeof state.agreementVersion === 'number' &&
     typeof state.finalized === 'boolean' &&
+    (state.finalizedBy === undefined || isPartyRole(state.finalizedBy)) &&
+    (state.finalizedAt === undefined || typeof state.finalizedAt === 'string') &&
     typeof state.stampCompleted === 'boolean' &&
     typeof state.notarized === 'boolean' &&
     (state.lastUpdatedBy === undefined || isPartyRole(state.lastUpdatedBy))

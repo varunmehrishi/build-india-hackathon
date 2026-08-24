@@ -60,10 +60,6 @@ export function ShareDialog({ agreement, furthestStepIndex, activeRole, onClose 
             This link opens revision {agreement.snapshotRevision} and assigns the recipient as the {invitedRole}.
           </p>
         </div>
-        <div className="share-warning">
-          <strong>This link is compressed, not encrypted.</strong>
-          <span>It contains the party names, property address, financial terms, clauses, and workflow status. Aadhaar and login information are excluded.</span>
-        </div>
         {invite.error ? (
           <div className="error-summary" role="alert">{invite.error}</div>
         ) : (

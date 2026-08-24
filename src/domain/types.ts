@@ -65,6 +65,8 @@ export interface AgreementState {
   }
   agreementVersion: number
   finalized: boolean
+  finalizedBy?: PartyRole
+  finalizedAt?: string
   stampCompleted: boolean
   notarized: boolean
 }

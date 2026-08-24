@@ -80,13 +80,11 @@ export function IntentScreen({ initialValue, onContinue }: IntentScreenProps) {
               onChange={(event) => setIntent(event.target.value)}
               placeholder="I need an 11-month rent agreement for a flat in Bengaluru."
               aria-invalid={error ? true : undefined}
-              aria-describedby={error ? 'intent-error' : 'intent-hint'}
+              aria-describedby={error ? 'intent-error' : undefined}
             />
             {error ? (
               <span className="field-error" id="intent-error" role="alert">{error}</span>
-            ) : (
-              <span className="field-hint" id="intent-hint">No AI call—routing is private and deterministic.</span>
-            )}
+            ) : null}
           </div>
           <Button type="submit">Find my workflow</Button>
         </form>

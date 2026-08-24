@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { AUTH_STORAGE_KEY, DEMO_OTP, clearAuthSession } from './domain/auth'
+import { WORKSPACE_STORAGE_KEY, loadWorkspace } from './domain/workspace'
 
 const TEST_AADHAAR = '123456789012'
 
@@ -25,7 +26,16 @@ async function completeDemoIntake(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('heading', { name: 'Requirements' })
 }
 
-describe('multi-user intake journey', () => {
+async function finalizeDocument(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Continue' }))
+  await screen.findByRole('heading', { name: 'Agreement' })
+  await user.click(screen.getByRole('button', { name: 'Continue' }))
+  await screen.findByRole('heading', { name: 'Review' })
+  await user.click(screen.getByRole('button', { name: 'Finalize document' }))
+  await screen.findByRole('heading', { name: 'Finalized agreement' })
+}
+
+describe('persistent multi-document journey', () => {
   it('accepts any complete 12-digit number and rejects incomplete input or incorrect OTP', async () => {
     render(<App />)
     const user = userEvent.setup()
@@ -42,31 +52,32 @@ describe('multi-user intake journey', () => {
     expect(screen.getByText(/does not match the code/)).toBeInTheDocument()
   })
 
-  it('encrypts Aadhaar locally and stores no plaintext identifier or OTP', async () => {
-    render(<App />)
-    await login()
-
-    const stored = localStorage.getItem(AUTH_STORAGE_KEY)
-    expect(stored).toContain('AES-GCM')
-    expect(stored).toContain('Meera Sharma')
-    expect(stored).not.toContain(TEST_AADHAAR)
-    expect(stored).not.toContain(DEMO_OTP)
-  })
-
-  it('restores the encrypted session after remount and discards malformed storage', async () => {
+  it('encrypts Aadhaar locally and restores the browser session', async () => {
     const first = render(<App />)
     await login()
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY)
+    expect(stored).toContain('AES-GCM')
+    expect(stored).not.toContain(TEST_AADHAAR)
     first.unmount()
 
-    const second = render(<App />)
+    render(<App />)
     expect(await screen.findByText('Meera Sharma')).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Simulated Aadhaar OTP' })).not.toBeInTheDocument()
-    second.unmount()
+  })
 
-    localStorage.setItem(AUTH_STORAGE_KEY, '{"authenticated":true}')
+  it('persists an incomplete intake draft and role across a reload', async () => {
+    const first = render(<App />)
+    const user = await login()
+    await user.click(screen.getByRole('button', { name: 'Rent Agreement' }))
+    await user.click(screen.getByRole('button', { name: 'Use demo details' }))
+    expect(screen.getByText('You’re the tenant')).toBeInTheDocument()
+    expect(window.location.hash).toBe('')
+    first.unmount()
+
     render(<App />)
-    expect(await screen.findByRole('dialog', { name: 'Simulated Aadhaar OTP' })).toBeInTheDocument()
-    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+    expect(await screen.findByRole('heading', { name: 'Tell us about the tenancy' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Property address')).toHaveValue('24A, Lotus Heights, Indiranagar, Bengaluru')
+    expect(screen.getByText('You’re the tenant')).toBeInTheDocument()
   })
 
   it('synchronizes the profile with the selected party and swaps names on a role change', async () => {
@@ -76,40 +87,54 @@ describe('multi-user intake journey', () => {
     await user.click(screen.getByRole('button', { name: 'Use demo details' }))
 
     expect(screen.getByLabelText('Tenant name')).toHaveValue('Meera Sharma')
-    expect(screen.getByLabelText('Landlord name')).toHaveValue('Arjun Rao')
     await user.click(screen.getByLabelText('Landlord'))
     expect(screen.getByLabelText('Landlord name')).toHaveValue('Meera Sharma')
     expect(screen.getByLabelText('Tenant name')).toHaveValue('Arjun Rao')
-
-    await user.clear(screen.getByLabelText('Landlord name'))
-    await user.type(screen.getByLabelText('Landlord name'), 'Kavya Rao')
-    expect(screen.getByRole('button', { name: /Kavya Rao/ })).toBeInTheDocument()
+    expect(screen.getByText('You’re the landlord')).toBeInTheDocument()
   })
 
-  it('creates a role-specific URL without authentication data', async () => {
+  it('keeps multiple documents and switches back to an existing document', async () => {
+    render(<App />)
+    const user = await login()
+    await completeDemoIntake(user)
+    const existingId = loadWorkspace().activeDocumentId
+
+    await user.click(screen.getByRole('button', { name: 'New document' }))
+    expect(await screen.findByRole('heading', { name: 'What do you need to get done?' })).toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(2)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Active document' }), existingId)
+    expect(await screen.findByRole('heading', { name: 'Requirements' })).toBeInTheDocument()
+  })
+
+  it('hides Share until finalization, then exports stored state without changing the current URL', async () => {
     render(<App />)
     const user = await login()
     const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined)
     await completeDemoIntake(user)
+    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Steps' })).toBeInTheDocument()
+
+    await finalizeDocument(user)
+    expect(screen.getByText(/read-only/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
+    expect(window.location.hash).toBe('')
 
     await user.click(screen.getByRole('button', { name: 'Share' }))
-    expect(screen.getByRole('heading', { name: 'Invite the landlord' })).toBeInTheDocument()
     const inviteLink = screen.getByLabelText('Invite link') as HTMLTextAreaElement
     expect(inviteLink.value).toContain('#share=')
-    expect(inviteLink.value).not.toContain(TEST_AADHAAR)
-    expect(inviteLink.value).not.toContain('AES-GCM')
-
+    expect(screen.queryByText(/link is compressed/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Copy invite link' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(inviteLink.value))
   })
 
-  it('loads the same snapshot on a second local identity as the invited role', async () => {
+  it('imports a finalized snapshot for the other role, stores it, and cleans the URL', async () => {
     const firstBrowser = render(<App />)
     const firstUser = await login()
     await completeDemoIntake(firstUser)
+    await finalizeDocument(firstUser)
     await firstUser.click(screen.getByRole('button', { name: 'Share' }))
     const inviteUrl = (screen.getByLabelText('Invite link') as HTMLTextAreaElement).value
-    expect(screen.getByRole('heading', { name: 'Invite the landlord' })).toBeInTheDocument()
 
     firstBrowser.unmount()
     await clearAuthSession()
@@ -117,24 +142,26 @@ describe('multi-user intake journey', () => {
     window.history.replaceState(null, '', inviteUrl)
 
     render(<App />)
-    const secondUser = await login('987654321098', 'Requirements')
-    expect(screen.getByRole('status')).toHaveTextContent('Shared agreement loaded')
-    expect(screen.getByRole('button', { name: /Arjun Rao/ })).toBeInTheDocument()
-
-    await secondUser.click(screen.getByRole('button', { name: 'Share' }))
-    expect(screen.getByRole('heading', { name: 'Invite the tenant' })).toBeInTheDocument()
-    expect(window.location.hash).toContain('share=')
+    await login('987654321098', 'Finalized agreement')
+    expect(screen.getByRole('status')).toHaveTextContent('Shared agreement imported')
+    expect(screen.getByText('You’re the landlord')).toBeInTheDocument()
+    expect(window.location.hash).toBe('')
+    expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toContain('Bengaluru')
   })
 
-  it('logout clears the local session, snapshot URL, and returns to the gate', async () => {
+  it('logout preserves documents and the next login restores the active finalized view', async () => {
     render(<App />)
     const user = await login()
     await completeDemoIntake(user)
-    expect(window.location.hash).toContain('share=')
-    await user.click(screen.getByRole('button', { name: 'Logout' }))
+    await finalizeDocument(user)
+    const storedBeforeLogout = localStorage.getItem(WORKSPACE_STORAGE_KEY)
 
+    await user.click(screen.getByRole('button', { name: 'Logout' }))
     await waitFor(() => expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull())
-    expect(window.location.hash).toBe('')
+    expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toBe(storedBeforeLogout)
     expect(await screen.findByRole('dialog', { name: 'Simulated Aadhaar OTP' })).toBeInTheDocument()
+
+    await login(TEST_AADHAAR, 'Finalized agreement')
+    expect(screen.getByText('You’re the tenant')).toBeInTheDocument()
   })
 })

@@ -10,7 +10,8 @@ Frontend-only React + TypeScript + Vite prototype for the rent-agreement hackath
 - Simulated local Aadhaar OTP login with an encrypted browser vault.
 - Intent routing and a validated, editable tenancy-details intake.
 - Editable local profiles synchronized with the signed-in agreement party.
-- Compressed, role-specific URL snapshots for two-device collaboration.
+- Persistent browser-local workspaces with multiple rent-agreement documents.
+- Point-in-time Base64URL import/export for two-device collaboration.
 - Placeholder screens for the remaining journey steps.
 - Reset Demo control.
 
@@ -36,14 +37,14 @@ npm run lint
 
 ## Collaboration model
 
-After intake, use **Share** to create an invite for the other party. The URL contains a
-compressed point-in-time agreement snapshot and binds the recipient to the invited role.
-Opening a newer link replaces the recipient's current in-memory state.
+Documents and in-progress drafts are saved in the browser. A simple selector allows multiple
+agreements to be retained and reopened across reloads and login sessions.
 
-Snapshot URLs are not encrypted. They may contain party names, the property address,
-financial terms, clauses, and workflow status. Aadhaar, OTP, local participant IDs, and
-authentication state are never included. There is no real-time synchronization or government
-identity integration.
+Sharing is available after a landlord or tenant finalizes the active document. **Share** exports
+the latest saved document as a point-in-time Base64URL invite for the other role. Opening an
+invite imports or replaces the matching document in local storage, activates it, and removes the
+payload from the address bar. There is no real-time synchronization or government identity
+integration.
 
 ## Deployment
 

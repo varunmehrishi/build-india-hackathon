@@ -12,7 +12,7 @@ export function Stepper({ steps, activeStepId, onSelectStep, maxSelectableIndex 
   const activeIndex = steps.findIndex((step) => step.id === activeStepId)
 
   return (
-    <nav className="stepper" aria-label="Workflow progress">
+    <nav className="stepper" aria-label="Steps">
       {steps.map((step, index) => {
         const state =
           index < activeIndex ? 'done' : index === activeIndex ? 'current' : 'todo'

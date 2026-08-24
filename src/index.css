@@ -78,6 +78,7 @@ button { color: inherit; }
 .brand small { color: var(--muted); font-size: 0.74rem; }
 .header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
 .citizen-name { color: var(--muted); font-size: 0.86rem; font-weight: 600; }
+.document-select { max-width: 190px; min-height: 40px; padding: 7px 30px 7px 10px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--text); font-size: .78rem; font-weight: 700; }
 
 .bootstrap-loading {
   min-height: calc(100vh - 44px);
@@ -258,7 +259,6 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   background: var(--surface);
   box-shadow: 0 30px 90px rgba(9, 27, 22, 0.3);
 }
-.share-warning { display: grid; gap: 5px; padding: 14px; border: 1px solid #ead59a; border-radius: 14px; background: #fff8df; color: #755019; font-size: .8rem; line-height: 1.45; }
 .share-link { width: 100%; resize: none; border: 1px solid var(--border-strong); border-radius: 13px; padding: 12px; background: #f6f8f5; color: var(--muted); font: .72rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .details-content { margin-top: 25px; gap: 25px; }
@@ -306,6 +306,22 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .placeholder-list { margin: 0; padding-left: 18px; display: grid; gap: 7px; color: var(--muted); }
 .journey-actions { justify-content: space-between; }
 
+.finalized-content { width: min(920px, 100%); margin: 34px auto 80px; }
+.finalized-card { display: grid; gap: 24px; padding: clamp(24px, 5vw, 44px); }
+.finalized-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.finalized-heading h1 { font-size: clamp(2.4rem, 5vw, 4rem); }
+.document-meta, .party-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.document-meta { padding: 15px; border-radius: 16px; background: var(--cream); }
+.document-meta span, .party-grid div { display: grid; gap: 5px; }
+.document-meta small, .party-grid small { color: var(--muted); }
+.finalized-section { display: grid; gap: 13px; padding-top: 22px; border-top: 1px solid var(--border); }
+.finalized-section > * { margin: 0; }
+.party-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.party-grid div { padding: 15px; border: 1px solid var(--border); border-radius: 15px; background: #fbfcfa; }
+.clause-list { display: grid; gap: 11px; }
+.clause-list article { padding: 16px; border: 1px solid var(--border); border-radius: 15px; background: #fbfcfa; }
+.clause-list p { margin: 7px 0 0; color: var(--muted); line-height: 1.55; }
+
 .btn:focus-visible, .brand:focus-visible, .workflow-card:focus-visible, .stepper-item:focus-visible, .message-prefill:focus-visible, .profile-trigger:focus-visible { outline: 3px solid rgba(18, 111, 97, 0.32); outline-offset: 3px; }
 
 @media (max-width: 850px) {
@@ -313,6 +329,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .form-section { grid-template-columns: 1fr; gap: 18px; }
   .sidebar { display: none; }
   .transaction-summary { grid-template-columns: 1fr; }
+  .document-meta { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -322,6 +339,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .header-actions .btn { min-height: 38px; padding: 8px 11px; font-size: .76rem; }
   .brand small { display: none; }
   .profile-trigger > span:nth-child(2) { display: none; }
+  .document-select { max-width: 145px; }
   .focused-content { margin-top: 30px; gap: 32px; }
   .workflow-card-grid, .form-grid { grid-template-columns: 1fr; }
   .workflow-card { grid-template-columns: auto 1fr; }
@@ -334,6 +352,8 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .role-options { grid-template-columns: 1fr; }
   .error-summary { align-items: flex-start; flex-direction: column; }
   .message-notification { top: 12px; right: 50%; transform: translateX(50%); }
+  .finalized-heading { flex-direction: column; }
+  .party-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
