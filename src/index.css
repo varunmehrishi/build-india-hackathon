@@ -323,6 +323,33 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .clause-list article { padding: 16px; border: 1px solid var(--border); border-radius: 15px; background: #fbfcfa; }
 .clause-list p { margin: 7px 0 0; color: var(--muted); line-height: 1.55; }
 
+.stamp-content { width: 100%; }
+.stamp-card { display: grid; gap: 24px; padding: clamp(24px, 5vw, 42px); }
+.stamp-heading, .stamp-section-heading, .contribution-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.stamp-heading h1 { font-size: clamp(2.4rem, 5vw, 4rem); }
+.stamp-overview { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; padding: 15px; border-radius: 16px; background: var(--cream); }
+.stamp-overview span, .contribution-heading > div, .receipt > div { display: grid; gap: 5px; min-width: 0; }
+.stamp-overview small, .contribution-heading small, .receipt small { color: var(--muted); }
+.stamp-disclaimer { margin: 0; padding: 13px 15px; border: 1px solid #eedda9; border-radius: 14px; background: #fff8e6; color: #73501c; font-size: .8rem; line-height: 1.5; }
+.stamp-section { display: grid; gap: 16px; padding-top: 22px; border-top: 1px solid var(--border); }
+.stamp-section > * { margin-top: 0; margin-bottom: 0; }
+.stamp-section-heading h2 { font-size: 1.5rem; }
+.split-presets { display: flex; flex-wrap: wrap; gap: 9px; }
+.custom-split { display: grid; grid-template-columns: minmax(190px, 260px) auto 1fr; align-items: end; gap: 11px; }
+.custom-complement { align-self: center; color: var(--muted); font-size: .82rem; }
+.split-note { font-size: .8rem; }
+.contribution-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.contribution-card { display: grid; align-content: start; gap: 18px; padding: 18px; border: 1px solid var(--border); border-radius: 17px; background: #fbfcfa; }
+.contribution-card.is-current-party { border-color: #9fc8bd; box-shadow: inset 0 0 0 1px #cbe3dc; }
+.contribution-amount { display: grid; gap: 3px; }
+.contribution-amount strong { font: 700 2rem 'Fraunces', Georgia, serif; }
+.contribution-amount span, .party-message { color: var(--muted); font-size: .8rem; }
+.party-message { margin: 0; line-height: 1.45; }
+.success-message { color: #207044; font-weight: 700; }
+.receipt-list { display: grid; gap: 10px; }
+.receipt { display: grid; grid-template-columns: 1.3fr .7fr 1.5fr 1fr; gap: 12px; padding: 15px; border: 1px solid var(--border); border-radius: 15px; background: #fbfcfa; }
+.receipt strong { overflow-wrap: anywhere; font-size: .78rem; }
+
 .btn:focus-visible, .brand:focus-visible, .workflow-card:focus-visible, .stepper-item:focus-visible, .message-prefill:focus-visible, .profile-trigger:focus-visible { outline: 3px solid rgba(18, 111, 97, 0.32); outline-offset: 3px; }
 
 @media (max-width: 850px) {
@@ -331,6 +358,9 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .sidebar { display: none; }
   .transaction-summary { grid-template-columns: 1fr; }
   .document-meta { grid-template-columns: 1fr; }
+  .stamp-overview, .receipt { grid-template-columns: 1fr; }
+  .custom-split { grid-template-columns: 1fr auto; }
+  .custom-complement { grid-column: 1 / -1; }
 }
 
 @media (max-width: 640px) {
@@ -355,6 +385,9 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .message-notification { top: 12px; right: 50%; transform: translateX(50%); }
   .finalized-heading { flex-direction: column; }
   .party-grid { grid-template-columns: 1fr; }
+  .stamp-heading { flex-direction: column; }
+  .contribution-grid, .custom-split { grid-template-columns: 1fr; }
+  .custom-split .btn { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

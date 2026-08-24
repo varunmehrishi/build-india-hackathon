@@ -13,7 +13,8 @@ Frontend-only React + TypeScript + Vite prototype for the rent-agreement hackath
 - Persistent browser-local workspaces with multiple rent-agreement documents.
 - Editable document names suggested from the landlord and tenant names.
 - Point-in-time Base64URL import/export for two-device collaboration.
-- Placeholder screens for the remaining journey steps.
+- Configurable simulated stamp-duty payments with role-specific contributions and receipts.
+- Placeholder screens for identity, notary, eSign, and completion.
 - Reset Demo control.
 
 ## Local development
@@ -48,9 +49,11 @@ invite imports or replaces the matching document in local storage, activates it,
 payload from the address bar. There is no real-time synchronization or government identity
 integration.
 
-Finalizing locks the agreement content but keeps the journey active. The demo can continue
-through the existing Stamp duty, Identity, Notary, eSign, and Completion placeholder steps,
-while the pre-finalization steps remain locked.
+Finalizing locks the agreement content but keeps the journey active. On Stamp duty, either party
+can choose a landlord-paid, tenant-paid, 50/50, or custom split before payment starts. Each browser
+can pay only its assigned party's simulated contribution. The split and receipts travel in the
+shared snapshot, enabling the other party to import it and finish a split payment. Identity remains
+locked until all required contributions are paid; later journey steps remain placeholders.
 
 ## Deployment
 

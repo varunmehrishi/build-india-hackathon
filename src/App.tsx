@@ -15,6 +15,7 @@ import {
 import { workflowStepOrder, workflowSteps } from './domain/demoData'
 import { applyIntakeDraft, suggestDocumentName } from './domain/intake'
 import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
+import { configureStampDutyPayment, isStampDutyComplete, recordStampDutyPayment } from './domain/stampDuty'
 import type { IntakeDraft, WorkflowStep } from './domain/types'
 import {
   activeDocument,
@@ -34,9 +35,11 @@ import { FinalizedView } from './features/finalized/FinalizedView'
 import { DetailsScreen } from './features/intake/DetailsScreen'
 import { IntentScreen } from './features/intake/IntentScreen'
 import { ShareDialog } from './features/sharing/ShareDialog'
+import { StampDutyScreen } from './features/stamp/StampDutyScreen'
 
 type AuthState = DemoAuthSession | null | undefined
 const finalizedStepIndex = workflowStepOrder.indexOf('finalized')
+const stampStepIndex = workflowStepOrder.indexOf('stamp')
 
 function roleName(snapshot: WorkflowSnapshotEnvelope | null): string | undefined {
   if (!snapshot?.invitedRole) return undefined
@@ -174,6 +177,7 @@ function App() {
     const nextIndex = workflowStepOrder.indexOf(step)
     if (nextIndex > furthestStepIndex) return
     if (state.finalized && nextIndex < finalizedStepIndex) return
+    if (state.finalized && !state.stampCompleted && nextIndex > stampStepIndex) return
     mutateActiveDocument((current) => ({
       ...current,
       agreement: {
@@ -314,6 +318,47 @@ function App() {
     setNotice(`Document finalized by the ${activeRole}.`)
   }
 
+  function configureStampDuty(landlordPercentage: number) {
+    if (!activeRole || state.workflowStep !== 'stamp') return
+    try {
+      mutateActiveDocument((current) => ({
+        ...current,
+        agreement: {
+          ...current.agreement,
+          stampDutyPayment: configureStampDutyPayment(current.agreement, landlordPercentage, activeRole),
+          stampCompleted: false,
+          snapshotRevision: current.agreement.snapshotRevision + 1,
+          lastUpdatedBy: activeRole,
+        },
+      }))
+      setNotice(`Payment split updated by the ${activeRole}.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'The payment split could not be updated.')
+    }
+  }
+
+  async function payStampDuty() {
+    if (!activeRole || state.workflowStep !== 'stamp') throw new Error('No party role is assigned.')
+    let completed = false
+    mutateActiveDocument((current) => {
+      const stampDutyPayment = recordStampDutyPayment(current.agreement, activeRole)
+      completed = isStampDutyComplete(stampDutyPayment)
+      return {
+        ...current,
+        agreement: {
+          ...current.agreement,
+          stampDutyPayment,
+          stampCompleted: completed,
+          snapshotRevision: current.agreement.snapshotRevision + 1,
+          lastUpdatedBy: activeRole,
+        },
+      }
+    })
+    setNotice(completed
+      ? 'Stamp duty completed. You can continue to Identity.'
+      : `Your contribution is complete. Share the document with the ${activeRole === 'landlord' ? 'tenant' : 'landlord'} to continue.`)
+  }
+
   function openShare() {
     const storedWorkspace = loadWorkspace()
     const storedDocument = storedWorkspace.documents[state.agreementId]
@@ -371,7 +416,9 @@ function App() {
                   steps={workflowSteps}
                   activeStepId={state.workflowStep}
                   onSelectStep={updateWorkflowStep}
-                  maxSelectableIndex={furthestStepIndex}
+                  maxSelectableIndex={state.finalized && !state.stampCompleted
+                    ? Math.min(furthestStepIndex, stampStepIndex)
+                    : furthestStepIndex}
                   minSelectableIndex={state.finalized ? finalizedStepIndex : undefined}
                 />
               </Card>
@@ -380,6 +427,14 @@ function App() {
             <main className="content" id="main-content">
               {state.workflowStep === 'finalized' ? (
                 <FinalizedView agreement={state} localRole={activeRole} />
+              ) : state.workflowStep === 'stamp' ? (
+                <StampDutyScreen
+                  agreement={state}
+                  documentName={documentLabel(document)}
+                  activeRole={activeRole}
+                  onConfigure={configureStampDuty}
+                  onPay={payStampDuty}
+                />
               ) : (
                 <Card className="stage-card">
                   <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>
@@ -400,7 +455,10 @@ function App() {
                 {state.workflowStep === 'review' ? (
                   <Button onClick={finalizeDocument}>Finalize document</Button>
                 ) : (
-                  <Button onClick={() => moveStep(1)} disabled={state.workflowStep === 'complete'}>Continue</Button>
+                  <Button
+                    onClick={() => moveStep(1)}
+                    disabled={state.workflowStep === 'complete' || (state.workflowStep === 'stamp' && !state.stampCompleted)}
+                  >Continue</Button>
                 )}
               </div>
             </main>

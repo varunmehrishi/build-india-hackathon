@@ -1,5 +1,5 @@
 import { Unzlib, zlibSync } from 'fflate'
-import type { AgreementState, PartyRole, WorkflowStep } from './types'
+import type { AgreementState, PartyRole, StampDutyContribution, WorkflowStep } from './types'
 
 export const SNAPSHOT_FRAGMENT_KEY = 'share'
 export const MAX_ENCODED_SNAPSHOT_LENGTH = 64 * 1024
@@ -82,6 +82,43 @@ function isClause(value: unknown): boolean {
   return typeof clause.id === 'string' && typeof clause.title === 'string' && typeof clause.text === 'string'
 }
 
+function isStampContribution(value: unknown): value is StampDutyContribution {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Partial<StampDutyContribution>
+  return (
+    typeof item.percentage === 'number' &&
+    Number.isInteger(item.percentage) &&
+    item.percentage >= 0 &&
+    item.percentage <= 100 &&
+    typeof item.amount === 'number' &&
+    Number.isInteger(item.amount) &&
+    item.amount >= 0 &&
+    (item.status === 'not-required' || item.status === 'pending' || item.status === 'paid') &&
+    (item.paymentReference === undefined || typeof item.paymentReference === 'string') &&
+    (item.paidAt === undefined || typeof item.paidAt === 'string')
+  )
+}
+
+function isStampDutyPayment(value: unknown, totalAmount: number): boolean {
+  if (!value || typeof value !== 'object') return false
+  const payment = value as Record<string, unknown>
+  const landlord = payment.landlord as StampDutyContribution | undefined
+  const tenant = payment.tenant as StampDutyContribution | undefined
+  return (
+    isStampContribution(landlord) &&
+    isStampContribution(tenant) &&
+    landlord.percentage + tenant.percentage === 100 &&
+    landlord.amount === Math.ceil(totalAmount * landlord.percentage / 100) &&
+    tenant.amount === totalAmount - landlord.amount &&
+    (landlord.status === 'not-required') === (landlord.amount === 0) &&
+    (tenant.status === 'not-required') === (tenant.amount === 0) &&
+    (landlord.status !== 'paid' || (!!landlord.paymentReference && !!landlord.paidAt)) &&
+    (tenant.status !== 'paid' || (!!tenant.paymentReference && !!tenant.paidAt)) &&
+    (payment.configuredBy === undefined || isPartyRole(payment.configuredBy)) &&
+    typeof payment.locked === 'boolean'
+  )
+}
+
 export function isAgreementState(value: unknown): value is AgreementState {
   if (!value || typeof value !== 'object') return false
   const state = value as Partial<AgreementState>
@@ -118,6 +155,7 @@ export function isAgreementState(value: unknown): value is AgreementState {
     typeof state.finalized === 'boolean' &&
     (state.finalizedBy === undefined || isPartyRole(state.finalizedBy)) &&
     (state.finalizedAt === undefined || typeof state.finalizedAt === 'string') &&
+    (state.stampDutyPayment === undefined || isStampDutyPayment(state.stampDutyPayment, state.requirements.stampDutyAmount)) &&
     typeof state.stampCompleted === 'boolean' &&
     typeof state.notarized === 'boolean' &&
     (state.lastUpdatedBy === undefined || isPartyRole(state.lastUpdatedBy))

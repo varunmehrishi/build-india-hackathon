@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { zlibSync } from 'fflate'
 import { createInitialAgreementState } from './demoData'
 import { applyIntakeDraft, demoIntakeDraft } from './intake'
+import { configureStampDutyPayment, recordStampDutyPayment } from './stampDuty'
 import {
   MAX_ENCODED_SNAPSHOT_LENGTH,
   createSnapshotUrl,
@@ -40,6 +41,26 @@ describe('workflow snapshots', () => {
     window.history.replaceState(null, '', url)
     const result = snapshotFromLocation()
     expect(result?.ok).toBe(true)
+  })
+
+  it('round-trips a partial payment while accepting an older snapshot without payment state', () => {
+    const partial = createSnapshot('landlord')
+    partial.agreement.stampDutyPayment = configureStampDutyPayment(partial.agreement, 50, 'tenant')
+    partial.agreement.stampDutyPayment = recordStampDutyPayment(
+      partial.agreement,
+      'tenant',
+      '2026-08-25T10:00:00.000Z',
+      'BI-STAMP-PERSISTED',
+    )
+    const partialResult = decodeSnapshot(encodeSnapshot(partial))
+    expect(partialResult.ok).toBe(true)
+    if (partialResult.ok) {
+      expect(partialResult.snapshot.agreement.stampDutyPayment?.tenant.paymentReference).toBe('BI-STAMP-PERSISTED')
+    }
+
+    const older = createSnapshot('tenant')
+    expect(older.agreement.stampDutyPayment).toBeUndefined()
+    expect(decodeSnapshot(encodeSnapshot(older)).ok).toBe(true)
   })
 
   it('rejects malformed, oversized, and unsupported snapshots', () => {

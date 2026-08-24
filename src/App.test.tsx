@@ -137,15 +137,18 @@ describe('persistent multi-document journey', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(inviteLink.value))
   })
 
-  it('imports a finalized snapshot for the other role, stores it, and cleans the URL', async () => {
+  it('shares a partial split payment so the other role can import and complete it', async () => {
     const firstBrowser = render(<App />)
     const firstUser = await login()
     await completeDemoIntake(firstUser)
     await finalizeDocument(firstUser)
     await firstUser.click(screen.getByRole('button', { name: 'Continue' }))
     await screen.findByRole('heading', { name: 'Stamp duty' })
-    await firstUser.click(screen.getByRole('button', { name: 'Continue' }))
-    await screen.findByRole('heading', { name: 'Identity' })
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await firstUser.click(screen.getByRole('button', { name: 'Pay ₹900' }))
+    expect(await screen.findByText('Contribution received.')).toBeInTheDocument()
+    expect(screen.getByText(/share the document with the landlord/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
     await firstUser.click(screen.getByRole('button', { name: 'Share' }))
     const inviteUrl = (screen.getByLabelText('Invite link') as HTMLTextAreaElement).value
 
@@ -155,11 +158,18 @@ describe('persistent multi-document journey', () => {
     window.history.replaceState(null, '', inviteUrl)
 
     render(<App />)
-    await login('987654321098', 'Identity')
+    const secondUser = await login('987654321098', 'Stamp duty')
     expect(screen.getByRole('status')).toHaveTextContent('Shared agreement imported')
     expect(screen.getByText('You’re the landlord')).toBeInTheDocument()
+    expect(screen.getByText('Split locked')).toBeInTheDocument()
+    expect(screen.getByText(/BI-STAMP-/)).toBeInTheDocument()
     expect(window.location.hash).toBe('')
     expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toContain('Bengaluru')
+    await secondUser.click(screen.getByRole('button', { name: 'Pay ₹900' }))
+    expect(await screen.findByText(/stamp duty completed/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+    await secondUser.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('heading', { name: 'Identity' })).toBeInTheDocument()
   })
 
   it('executes the remaining steps while keeping pre-finalization steps locked', async () => {
@@ -173,6 +183,11 @@ describe('persistent multi-document journey', () => {
     for (const heading of ['Stamp duty', 'Identity', 'Notary', 'eSign', 'Completion']) {
       await user.click(screen.getByRole('button', { name: 'Continue' }))
       await screen.findByRole('heading', { name: heading })
+      if (heading === 'Stamp duty') {
+        await user.click(screen.getByRole('button', { name: 'Tenant 100%' }))
+        await user.click(screen.getByRole('button', { name: 'Pay ₹1,800' }))
+        await screen.findByText(/stamp duty completed/i)
+      }
       expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     }
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()

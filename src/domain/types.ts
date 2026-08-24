@@ -13,6 +13,23 @@ export type WorkflowStep =
 
 export type PartyRole = 'landlord' | 'tenant'
 
+export type StampContributionStatus = 'not-required' | 'pending' | 'paid'
+
+export interface StampDutyContribution {
+  percentage: number
+  amount: number
+  status: StampContributionStatus
+  paymentReference?: string
+  paidAt?: string
+}
+
+export interface StampDutyPaymentState {
+  landlord: StampDutyContribution
+  tenant: StampDutyContribution
+  configuredBy?: PartyRole
+  locked: boolean
+}
+
 export interface Party {
   id: 'landlord' | 'tenant'
   name: string
@@ -67,6 +84,7 @@ export interface AgreementState {
   finalized: boolean
   finalizedBy?: PartyRole
   finalizedAt?: string
+  stampDutyPayment?: StampDutyPaymentState
   stampCompleted: boolean
   notarized: boolean
 }
