@@ -23,11 +23,11 @@ async function completeDemoIntake(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Rent Agreement' }))
   await user.click(screen.getByRole('button', { name: 'Use demo details' }))
   await user.click(screen.getByRole('button', { name: 'Review what you need' }))
-  await screen.findByRole('heading', { name: 'Requirements' })
+  await screen.findByRole('heading', { name: 'Here’s what your agreement needs' })
 }
 
 async function finalizeDocument(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Continue' }))
+  await user.click(screen.getByRole('button', { name: 'Create Agreement' }))
   await screen.findByRole('heading', { name: 'Agreement' })
   await user.click(screen.getByRole('button', { name: 'Continue' }))
   await screen.findByRole('heading', { name: 'Review' })
@@ -113,7 +113,29 @@ describe('persistent multi-document journey', () => {
     expect(screen.getAllByRole('option')).toHaveLength(2)
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Active document' }), existingId)
-    expect(await screen.findByRole('heading', { name: 'Requirements' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Here’s what your agreement needs' })).toBeInTheDocument()
+  })
+
+  it('explains the transaction requirements and creates the agreement through the existing journey', async () => {
+    render(<App />)
+    const user = await login()
+    await completeDemoIntake(user)
+
+    expect(screen.getByText('Residential Rent Agreement')).toBeInTheDocument()
+    expect(screen.getByText('Bengaluru, Karnataka · 11 months')).toBeInTheDocument()
+    expect(screen.getByText('₹1,800')).toBeInTheDocument()
+    expect(screen.getByText('Landlord + Tenant')).toBeInTheDocument()
+    expect(screen.getByText('Stamp duty must be completed before execution.')).toBeInTheDocument()
+    expect(screen.getByText('You can add notarial attestation during execution.')).toBeInTheDocument()
+    expect(screen.getByText('Registration is not required for this demo scenario.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'What happens next' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByRole('heading', { name: 'Tell us about the tenancy' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Review what you need' }))
+    await screen.findByRole('heading', { name: 'Here’s what your agreement needs' })
+    await user.click(screen.getByRole('button', { name: 'Create Agreement' }))
+    expect(await screen.findByRole('heading', { name: 'Agreement' })).toBeInTheDocument()
   })
 
   it('hides Share until finalization, then exports stored state without changing the current URL', async () => {

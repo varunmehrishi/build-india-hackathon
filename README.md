@@ -12,6 +12,7 @@ Frontend-only React + TypeScript + Vite prototype for the Saral Setu rent-agreem
 - Editable local profiles synchronized with the signed-in agreement party.
 - Persistent browser-local workspaces with multiple rent-agreement documents.
 - Editable document names suggested from the landlord and tenant names.
+- A transaction-specific Requirements plan derived from the completed tenancy details.
 - Point-in-time Base64URL import/export for two-device collaboration.
 - Configurable simulated stamp-duty payments with role-specific contributions and receipts.
 - Placeholder screens for identity, notary, eSign, and completion.

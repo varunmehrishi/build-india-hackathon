@@ -34,6 +34,7 @@ import { ProfileMenu } from './features/auth/ProfileMenu'
 import { FinalizedView } from './features/finalized/FinalizedView'
 import { DetailsScreen } from './features/intake/DetailsScreen'
 import { IntentScreen } from './features/intake/IntentScreen'
+import { RequirementsScreen } from './features/requirements/RequirementsScreen'
 import { ShareDialog } from './features/sharing/ShareDialog'
 import { StampDutyScreen } from './features/stamp/StampDutyScreen'
 
@@ -435,6 +436,8 @@ function App() {
                   onConfigure={configureStampDuty}
                   onPay={payStampDuty}
                 />
+              ) : state.workflowStep === 'requirements' ? (
+                <RequirementsScreen agreement={state} />
               ) : (
                 <Card className="stage-card">
                   <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>
@@ -458,7 +461,7 @@ function App() {
                   <Button
                     onClick={() => moveStep(1)}
                     disabled={state.workflowStep === 'complete' || (state.workflowStep === 'stamp' && !state.stampCompleted)}
-                  >Continue</Button>
+                  >{state.workflowStep === 'requirements' ? 'Create Agreement' : 'Continue'}</Button>
                 )}
               </div>
             </main>
