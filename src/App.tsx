@@ -15,6 +15,11 @@ import {
 import { workflowStepOrder, workflowSteps } from './domain/demoData'
 import { generateAgreement, resolveAgreementBuilderConfiguration } from './domain/agreementBuilder'
 import { applyIntakeDraft, suggestDocumentName } from './domain/intake'
+import {
+  areBothPartiesVerified,
+  clearExecutionVerification,
+  verifyPartyForExecution,
+} from './domain/identityVerification'
 import { finalizeReviewedAgreement, resolveReviewState } from './domain/review'
 import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
 import { configureStampDutyPayment, isStampDutyComplete, recordStampDutyPayment } from './domain/stampDuty'
@@ -37,6 +42,7 @@ import { ProfileMenu } from './features/auth/ProfileMenu'
 import { FinalizedView } from './features/finalized/FinalizedView'
 import { DetailsScreen } from './features/intake/DetailsScreen'
 import { IntentScreen } from './features/intake/IntentScreen'
+import { IdentityVerificationScreen } from './features/identity/IdentityVerificationScreen'
 import { RequirementsScreen } from './features/requirements/RequirementsScreen'
 import { AgreementReview } from './features/review/AgreementReview'
 import { ShareDialog } from './features/sharing/ShareDialog'
@@ -45,6 +51,7 @@ import { StampDutyScreen } from './features/stamp/StampDutyScreen'
 type AuthState = DemoAuthSession | null | undefined
 const finalizedStepIndex = workflowStepOrder.indexOf('finalized')
 const stampStepIndex = workflowStepOrder.indexOf('stamp')
+const identityStepIndex = workflowStepOrder.indexOf('identity')
 
 function roleName(snapshot: WorkflowSnapshotEnvelope | null): string | undefined {
   if (!snapshot?.invitedRole) return undefined
@@ -85,6 +92,10 @@ function App() {
   const activeRole = (storedRoleMatchesIdentity ? document.localRole : undefined)
     ?? (authSession ? roleForAgreement(authSession, state.agreementId) : undefined)
     ?? (!state.intakeCompleted ? (draft.initiator || undefined) : undefined)
+  const identityViewingRole = state.identityVerificationRole
+    ?? state.review?.currentRole
+    ?? activeRole
+    ?? state.initiator
 
   useEffect(() => {
     let cancelled = false
@@ -210,6 +221,7 @@ function App() {
     if (nextIndex > furthestStepIndex) return
     if (state.finalized && nextIndex < finalizedStepIndex) return
     if (state.finalized && !state.stampCompleted && nextIndex > stampStepIndex) return
+    if (nextIndex > identityStepIndex && !areBothPartiesVerified(state)) return
     mutateActiveDocument((current) => ({
       ...current,
       agreement: {
@@ -224,6 +236,7 @@ function App() {
   }
 
   function moveStep(offset: number) {
+    if (offset > 0 && state.workflowStep === 'identity' && !areBothPartiesVerified(state)) return
     const minimumIndex = state.finalized ? finalizedStepIndex : 0
     const nextIndex = Math.max(minimumIndex, Math.min(workflowSteps.length - 1, activeIndex + offset))
     mutateActiveDocument((current) => ({
@@ -346,10 +359,10 @@ function App() {
             ? current.agreement.agreementVersion + 1
             : current.agreement.agreementVersion,
           landlord: returningFromReview
-            ? { ...current.agreement.landlord, approvedAgreement: false }
+            ? { ...clearExecutionVerification(current.agreement.landlord), approvedAgreement: false }
             : current.agreement.landlord,
           tenant: returningFromReview
-            ? { ...current.agreement.tenant, approvedAgreement: false }
+            ? { ...clearExecutionVerification(current.agreement.tenant), approvedAgreement: false }
             : current.agreement.tenant,
           snapshotRevision: current.agreement.snapshotRevision + 1,
           lastUpdatedBy: activeRole,
@@ -448,6 +461,32 @@ function App() {
       : `Your contribution is complete. Share the document with the ${activeRole === 'landlord' ? 'tenant' : 'landlord'} to continue.`)
   }
 
+  function updateIdentityViewingRole(role: 'landlord' | 'tenant') {
+    mutateActiveDocument((current) => ({
+      ...current,
+      agreement: {
+        ...current.agreement,
+        identityVerificationRole: role,
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: role,
+      },
+    }))
+  }
+
+  function verifyIdentity(role: 'landlord' | 'tenant') {
+    if (role !== identityViewingRole || state.workflowStep !== 'identity') return
+    mutateActiveDocument((current) => ({
+      ...current,
+      agreement: {
+        ...verifyPartyForExecution(current.agreement, role),
+        identityVerificationRole: role,
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: role,
+      },
+    }))
+    setNotice(`${state[role].name} is verified for Agreement Version ${state.agreementVersion}.`)
+  }
+
   function openShare() {
     const storedWorkspace = loadWorkspace()
     const storedDocument = storedWorkspace.documents[state.agreementId]
@@ -524,6 +563,13 @@ function App() {
                   onConfigure={configureStampDuty}
                   onPay={payStampDuty}
                 />
+              ) : state.workflowStep === 'identity' ? (
+                <IdentityVerificationScreen
+                  agreement={state}
+                  viewingRole={identityViewingRole}
+                  onViewingRoleChange={updateIdentityViewingRole}
+                  onVerify={verifyIdentity}
+                />
               ) : state.workflowStep === 'requirements' ? (
                 <RequirementsScreen agreement={state} />
               ) : state.workflowStep === 'agreement' ? (
@@ -551,7 +597,11 @@ function App() {
                 ) : (
                   <Button
                     onClick={() => moveStep(1)}
-                    disabled={state.workflowStep === 'complete' || (state.workflowStep === 'stamp' && !state.stampCompleted)}
+                    disabled={
+                      state.workflowStep === 'complete' ||
+                      (state.workflowStep === 'stamp' && !state.stampCompleted) ||
+                      (state.workflowStep === 'identity' && !areBothPartiesVerified(state))
+                    }
                   >{state.workflowStep === 'requirements' ? 'Create Agreement' : 'Continue'}</Button>
                 )}
               </div>

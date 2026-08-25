@@ -1,4 +1,5 @@
 import { resolveAgreementBuilderConfiguration } from './agreementBuilder'
+import { clearExecutionVerification } from './identityVerification'
 import type {
   AgreementReviewState,
   AgreementState,
@@ -167,8 +168,8 @@ export function resolveProposal(
     clauses,
     agreementBuilder,
     agreementVersion: version,
-    landlord: { ...agreement.landlord, approvedAgreement: false },
-    tenant: { ...agreement.tenant, approvedAgreement: false },
+    landlord: { ...clearExecutionVerification(agreement.landlord), approvedAgreement: false },
+    tenant: { ...clearExecutionVerification(agreement.tenant), approvedAgreement: false },
     review: nextReview,
   }
 }

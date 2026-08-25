@@ -86,11 +86,11 @@ export const workflowSteps: readonly WorkflowStepConfig[] = [
     id: 'identity',
     title: 'Identity',
     kicker: 'Verification',
-    description: 'Plan the Aadhaar-style identity verification experience without collecting biometrics.',
+    description: 'Verify both people signing the finalized agreement with the local Aadhaar OTP simulation.',
     placeholderPoints: [
-      'Consent, scan, match, and verified states.',
-      'Synthetic identities only.',
-      'No real biometric processing.',
+      'Separate version-aware status for landlord and tenant.',
+      'Deterministic role switching and OTP verification.',
+      'No real KYC or biometric processing.',
     ],
   },
   {

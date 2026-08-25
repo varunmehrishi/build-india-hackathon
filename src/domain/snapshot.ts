@@ -73,6 +73,10 @@ function isParty(value: unknown, role: PartyRole): boolean {
     typeof party.name === 'string' &&
     (party.participantId === undefined || typeof party.participantId === 'string') &&
     typeof party.identityVerified === 'boolean' &&
+    (party.identityVerifiedVersion === undefined || (
+      typeof party.identityVerifiedVersion === 'number' && Number.isInteger(party.identityVerifiedVersion) && party.identityVerifiedVersion > 0
+    )) &&
+    (party.identityVerifiedAt === undefined || typeof party.identityVerifiedAt === 'string') &&
     typeof party.approvedAgreement === 'boolean' &&
     typeof party.signed === 'boolean'
   )
@@ -189,6 +193,7 @@ export function isAgreementState(value: unknown): value is AgreementState {
     state.clauses.every(isClause) &&
     (state.agreementBuilder === undefined || isAgreementBuilderConfiguration(state.agreementBuilder)) &&
     (state.review === undefined || isReviewState(state.review)) &&
+    (state.identityVerificationRole === undefined || isPartyRole(state.identityVerificationRole)) &&
     !!state.requirements &&
     typeof state.requirements.stampDutyAmount === 'number' &&
     typeof state.requirements.registrationRequired === 'boolean' &&

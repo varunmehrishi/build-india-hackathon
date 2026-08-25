@@ -33,6 +33,10 @@ describe('workflow snapshots', () => {
     }
     original.agreement.agreementBuilder = createDefaultAgreementBuilderConfiguration()
     original.agreement.agreementBuilder.deposit.refundDays = 7
+    original.agreement.identityVerificationRole = 'landlord'
+    original.agreement.landlord.identityVerified = true
+    original.agreement.landlord.identityVerifiedVersion = original.agreement.agreementVersion
+    original.agreement.landlord.identityVerifiedAt = '2026-08-26T10:00:00.000Z'
     original.agreement.clauses = [{
       id: 'security-deposit-refund',
       title: 'Security Deposit',

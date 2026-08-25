@@ -35,6 +35,8 @@ export interface Party {
   name: string
   participantId?: string
   identityVerified: boolean
+  identityVerifiedVersion?: number
+  identityVerifiedAt?: string
   approvedAgreement: boolean
   signed: boolean
 }
@@ -224,6 +226,7 @@ export interface AgreementState {
   clauses: Clause[]
   agreementBuilder?: AgreementBuilderConfiguration
   review?: AgreementReviewState
+  identityVerificationRole?: PartyRole
   requirements: {
     stampDutyAmount: number
     registrationRequired: boolean

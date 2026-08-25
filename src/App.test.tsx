@@ -38,6 +38,16 @@ async function finalizeDocument(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('heading', { name: 'Final agreement approved' })
 }
 
+async function verifyViewedParty(user: ReturnType<typeof userEvent.setup>, role: 'Landlord' | 'Tenant') {
+  const partyCard = screen.getByRole('region', { name: `${role} identity` })
+  await user.click(within(partyCard).getByRole('button', { name: 'Verify Identity' }))
+  const dialog = await screen.findByRole('dialog', { name: new RegExp(`Verify .*`) })
+  await user.type(within(dialog).getByRole('textbox', { name: 'Aadhaar number' }), TEST_AADHAAR)
+  await user.click(within(dialog).getByRole('button', { name: 'Send OTP' }))
+  await user.click(within(screen.getByLabelText('Demo message')).getByRole('button', { name: 'Prefill from Messages' }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: new RegExp(`Verify .*`) })).not.toBeInTheDocument())
+}
+
 describe('persistent multi-document journey', () => {
   it('accepts any complete 12-digit number and rejects incomplete input or incorrect OTP', async () => {
     render(<App />)
@@ -267,7 +277,38 @@ describe('persistent multi-document journey', () => {
     expect(await screen.findByText(/stamp duty completed/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
     await secondUser.click(screen.getByRole('button', { name: 'Continue' }))
-    expect(await screen.findByRole('heading', { name: 'Identity' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Verify the people signing' })).toBeInTheDocument()
+  })
+
+  it('verifies both viewed parties for the final version before continuing to Notary', async () => {
+    render(<App />)
+    const user = await login()
+    await completeDemoIntake(user)
+    await finalizeDocument(user)
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByRole('heading', { name: 'Stamp duty' })
+    await user.click(screen.getByRole('button', { name: 'Tenant 100%' }))
+    await user.click(screen.getByRole('button', { name: 'Pay ₹1,800' }))
+    await screen.findByText(/stamp duty completed/i)
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByRole('heading', { name: 'Verify the people signing' })
+
+    expect(screen.getByLabelText('Viewing as')).toHaveValue('landlord')
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await verifyViewedParty(user, 'Landlord')
+    expect(within(screen.getByRole('region', { name: 'Landlord identity' })).getByText('✓ Verified')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+
+    await user.selectOptions(screen.getByLabelText('Viewing as'), 'tenant')
+    await verifyViewedParty(user, 'Tenant')
+    expect(screen.getByText('Both parties are ready for execution.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+    const stored = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
+    expect(stored.landlord.identityVerifiedVersion).toBe(stored.agreementVersion)
+    expect(stored.tenant.identityVerifiedVersion).toBe(stored.agreementVersion)
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('heading', { name: 'Notary' })).toBeInTheDocument()
   })
 
   it('executes the remaining steps while keeping pre-finalization steps locked', async () => {
@@ -278,13 +319,18 @@ describe('persistent multi-document journey', () => {
 
     expect(screen.getByRole('button', { name: /5\. Review, locked/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
-    for (const heading of ['Stamp duty', 'Identity', 'Notary', 'eSign', 'Completion']) {
+    for (const heading of ['Stamp duty', 'Verify the people signing', 'Notary', 'eSign', 'Completion']) {
       await user.click(screen.getByRole('button', { name: 'Continue' }))
       await screen.findByRole('heading', { name: heading })
       if (heading === 'Stamp duty') {
         await user.click(screen.getByRole('button', { name: 'Tenant 100%' }))
         await user.click(screen.getByRole('button', { name: 'Pay ₹1,800' }))
         await screen.findByText(/stamp duty completed/i)
+      }
+      if (heading === 'Verify the people signing') {
+        await verifyViewedParty(user, 'Landlord')
+        await user.selectOptions(screen.getByLabelText('Viewing as'), 'tenant')
+        await verifyViewedParty(user, 'Tenant')
       }
       expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     }

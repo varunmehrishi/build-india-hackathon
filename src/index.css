@@ -485,6 +485,31 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .journey-preview li span { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #b9d8cf; border-radius: 50%; background: var(--accent-soft); color: var(--accent-dark); font-size: .72rem; font-weight: 800; }
 .journey-preview li strong { color: var(--text); }
 
+.identity-verification-content { width: 100%; }
+.identity-verification-card { display: grid; gap: 25px; padding: clamp(24px, 5vw, 42px); }
+.identity-verification-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.identity-verification-heading h1 { max-width: 13ch; font-size: clamp(2.4rem, 5vw, 4rem); }
+.identity-role-control { box-shadow: none; }
+.identity-version-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 17px; border-radius: 16px; background: var(--cream); }
+.identity-version-banner > span { display: grid; gap: 4px; }
+.identity-version-banner small { color: var(--muted); }
+.identity-party-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.identity-party-card { display: grid; align-content: start; gap: 19px; min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: #fbfcfa; }
+.identity-party-card.active { border-color: #9fc8bd; box-shadow: inset 0 0 0 1px #cbe3dc; background: #f8fcfa; }
+.identity-party-heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; }
+.identity-party-avatar { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: var(--accent-soft); color: var(--accent-dark); font-weight: 800; }
+.identity-party-heading > div:nth-child(2) { display: grid; gap: 3px; min-width: 0; }
+.identity-party-heading small { color: var(--muted); font-size: .7rem; font-weight: 700; }
+.identity-party-heading h2 { overflow-wrap: anywhere; font: 750 1rem 'Inter', system-ui, sans-serif; letter-spacing: 0; }
+.identity-verified-detail { display: grid; gap: 4px; padding: 12px; border-radius: 12px; background: #e9f6ed; color: #207044; font-size: .78rem; }
+.identity-ready-panel { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 13px; padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: #f7f9f6; }
+.identity-ready-panel > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #e4e8e4; color: var(--muted); font-weight: 900; }
+.identity-ready-panel h2 { font: 750 1rem 'Inter', system-ui, sans-serif; letter-spacing: 0; }
+.identity-ready-panel p { margin: 4px 0 0; color: var(--muted); font-size: .78rem; }
+.identity-ready-panel.complete { border-color: #b9ddc5; background: #f1f8f5; }
+.identity-ready-panel.complete > span { background: #dcefe3; color: #207044; }
+.identity-verification-layer .auth-dialog { width: min(500px, 100%); max-height: calc(100vh - 40px); overflow: auto; }
+
 .finalized-content { width: 100%; }
 .finalized-card { display: grid; gap: 24px; padding: clamp(24px, 5vw, 44px); }
 .finalized-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
@@ -541,6 +566,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .custom-split { grid-template-columns: 1fr auto; }
   .custom-complement { grid-column: 1 / -1; }
   .requirements-list { grid-template-columns: 1fr; }
+  .identity-verification-heading { align-items: stretch; flex-direction: column; }
   .agreement-builder-grid { grid-template-columns: 1fr; }
   .agreement-review-grid { grid-template-columns: 1fr; }
   .review-panel { display: none; }
@@ -578,6 +604,10 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .party-grid { grid-template-columns: 1fr; }
   .stamp-heading { flex-direction: column; }
   .contribution-grid, .custom-split { grid-template-columns: 1fr; }
+  .identity-party-grid { grid-template-columns: 1fr; }
+  .identity-version-banner { align-items: flex-start; flex-direction: column; }
+  .identity-party-heading { grid-template-columns: auto minmax(0, 1fr); }
+  .identity-party-heading .badge { grid-column: 2; }
   .custom-split .btn { width: 100%; }
   .journey-preview ol { grid-template-columns: 1fr; gap: 9px; }
   .journey-preview li { grid-template-columns: auto 1fr; align-items: center; justify-items: start; text-align: left; }
