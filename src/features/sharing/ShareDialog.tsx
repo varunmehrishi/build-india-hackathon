@@ -61,7 +61,7 @@ export function ShareDialog({ agreement, furthestStepIndex, activeRole, document
           <p className="eyebrow">Point-in-time collaboration</p>
           <h2 id="share-title">Invite the {invitedRole}</h2>
           <p className="muted">
-            This link opens revision {agreement.snapshotRevision} and assigns the recipient as the {invitedRole}.
+            This link imports the latest saved agreement and assigns the recipient as the {invitedRole}.
           </p>
         </div>
         {invite.error ? (

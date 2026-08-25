@@ -7,12 +7,14 @@ Frontend-only React + TypeScript + Vite prototype for the Saral Setu rent-agreem
 - GitHub Pages-ready Vite base path.
 - Shared UI primitives.
 - Workflow state and demo data.
-- Simulated local Aadhaar OTP login with an encrypted browser vault.
+- Simulated local Aadhaar OTP login with two memorable demo profiles, stable opaque participant IDs, and an encrypted browser vault.
 - Intent routing and a validated, editable tenancy-details intake.
 - Editable local profiles synchronized with the signed-in agreement party.
 - Persistent browser-local workspaces with multiple rent-agreement documents.
 - Editable document names suggested from the landlord and tenant names.
 - A transaction-specific Requirements plan derived from the completed tenancy details.
+- A responsive Agreement Builder with collapsible essential, recommended, and optional terms.
+- Deterministic clause generation, a live document preview, and Schedule A furnishing inventory.
 - Point-in-time Base64URL import/export for two-device collaboration.
 - Configurable simulated stamp-duty payments with role-specific contributions and receipts.
 - Placeholder screens for identity, notary, eSign, and completion.
@@ -43,6 +45,9 @@ npm run lint
 Documents and in-progress drafts are saved in the browser. A simple selector allows multiple
 agreements to be retained and reopened across reloads and login sessions. New agreements are
 named from both parties by default, and custom names remain stable when party details change.
+Builder choices, inventory, custom terms, and the generated clauses are stored with each document
+and included in shared snapshots. Clause text is generated locally from structured configuration;
+the builder does not call an LLM.
 
 Sharing is available after a landlord or tenant finalizes the active document. **Share** exports
 the latest saved document as a point-in-time Base64URL invite for the other role. Opening an

@@ -33,6 +33,7 @@ export interface StampDutyPaymentState {
 export interface Party {
   id: 'landlord' | 'tenant'
   name: string
+  participantId?: string
   identityVerified: boolean
   approvedAgreement: boolean
   signed: boolean
@@ -59,6 +60,106 @@ export interface Clause {
   status?: 'unchanged' | 'proposed' | 'accepted' | 'rejected'
 }
 
+export type ClauseImportance = 'essential' | 'recommended' | 'optional'
+export type FurnishingLevel = 'unfurnished' | 'semi-furnished' | 'fully-furnished'
+export type ResponsibleParty = 'landlord' | 'tenant' | 'included'
+export type InventoryCondition = 'New' | 'Good' | 'Fair' | 'Existing damage' | 'Not checked'
+
+export interface InventoryItem {
+  id: string
+  category: 'Furniture' | 'Major appliances' | 'Kitchen appliances' | 'Kitchenware' | 'Fixtures & fittings' | 'Electronics & smart devices' | 'Keys & access'
+  name: string
+  quantity: number
+  condition: InventoryCondition
+  notes: string
+  brand?: string
+  model?: string
+}
+
+export interface AgreementBuilderConfiguration {
+  rent: {
+    dueDay: number
+    paymentModes: string[]
+    latePaymentEnabled: boolean
+    graceDays: number
+    latePaymentConsequence: string
+    escalationEnabled: boolean
+    escalationPercent: number
+    escalationAfterMonths: number
+  }
+  deposit: {
+    refundDays: number
+    deductions: string[]
+  }
+  term: {
+    noticeEnabled: boolean
+    noticePeriod: string
+    lockInEnabled: boolean
+    lockInMonths: number
+    lockInAppliesTo: 'both parties' | 'tenant' | 'landlord'
+    renewalEnabled: boolean
+    renewalType: 'mutual written agreement' | 'automatic renewal'
+    earlyTerminationEnabled: boolean
+    earlyTerminationReasons: string[]
+  }
+  maintenance: {
+    enabled: boolean
+    regularChargesPaidBy: ResponsibleParty
+    majorAssessmentsPaidBy: Exclude<ResponsibleParty, 'included'>
+  }
+  utilities: {
+    enabled: boolean
+    items: Array<{ name: string; enabled: boolean; paidBy: Exclude<ResponsibleParty, 'included'> }>
+  }
+  repairs: {
+    enabled: boolean
+    tenantResponsibilities: string[]
+    landlordResponsibilities: string[]
+  }
+  usage: {
+    enabled: boolean
+    workFromHome: boolean
+    sublettingEnabled: boolean
+    subletting: 'written consent required' | 'allowed'
+    alterationsEnabled: boolean
+  }
+  occupancy: {
+    enabled: boolean
+    occupants: Array<{ id: string; name: string; relationship: string }>
+    guestConditionsEnabled: boolean
+    guestConditions: string
+    petsEnabled: boolean
+    pets: 'allowed' | 'allowed with conditions' | 'not permitted'
+    petConditions: string
+  }
+  access: {
+    enabled: boolean
+    noticeHours: number
+    emergencyException: boolean
+  }
+  parking: {
+    enabled: boolean
+    type: 'car' | 'two-wheeler' | 'both'
+    identifier: string
+  }
+  restoration: {
+    enabled: boolean
+    type: 'same condition' | 'agreed painting cost' | 'custom'
+    customText: string
+  }
+  furnishing: {
+    level: FurnishingLevel
+    inventory: InventoryItem[]
+  }
+  meterReadings: {
+    enabled: boolean
+    electricity: string
+    water: string
+    gas: string
+  }
+  customTerms: Array<{ id: string; text: string }>
+}
+
 export interface AgreementState {
   agreementId: string
   snapshotRevision: number
@@ -75,6 +176,7 @@ export interface AgreementState {
   landlord: Party
   tenant: Party
   clauses: Clause[]
+  agreementBuilder?: AgreementBuilderConfiguration
   requirements: {
     stampDutyAmount: number
     registrationRequired: boolean

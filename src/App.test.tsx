@@ -28,8 +28,8 @@ async function completeDemoIntake(user: ReturnType<typeof userEvent.setup>) {
 
 async function finalizeDocument(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Create Agreement' }))
-  await screen.findByRole('heading', { name: 'Agreement' })
-  await user.click(screen.getByRole('button', { name: 'Continue' }))
+  await screen.findByRole('heading', { name: 'Choose what matters for your home.' })
+  await user.click(screen.getByRole('button', { name: 'Continue to Review' }))
   await screen.findByRole('heading', { name: 'Review' })
   await user.click(screen.getByRole('button', { name: 'Finalize document' }))
   await screen.findByRole('heading', { name: 'Finalized agreement' })
@@ -50,6 +50,20 @@ describe('persistent multi-document journey', () => {
     await user.type(screen.getByRole('textbox', { name: '6-digit OTP' }), '111111')
     await user.click(screen.getByRole('button', { name: 'Verify & continue' }))
     expect(screen.getByText(/does not match the code/)).toBeInTheDocument()
+  })
+
+  it('prefills either stable demo identity from the login screen', async () => {
+    render(<App />)
+    const user = userEvent.setup()
+    const dialog = await screen.findByRole('dialog', { name: 'Simulated Aadhaar OTP' })
+    const identifier = within(dialog).getByRole('textbox', { name: 'Aadhaar number' })
+
+    await user.click(within(dialog).getByRole('button', { name: 'Prefill Arjun Rao Aadhaar 4444 5555 6666' }))
+    expect(identifier).toHaveValue('4444 5555 6666')
+    await user.click(within(dialog).getByRole('button', { name: 'Send OTP' }))
+    await user.click(within(screen.getByLabelText('Demo message')).getByRole('button', { name: 'Prefill from Messages' }))
+
+    expect(await screen.findByText('Arjun Rao')).toBeInTheDocument()
   })
 
   it('encrypts Aadhaar locally and restores the browser session', async () => {
@@ -135,7 +149,30 @@ describe('persistent multi-document journey', () => {
     await user.click(screen.getByRole('button', { name: 'Review what you need' }))
     await screen.findByRole('heading', { name: 'Here’s what your agreement needs' })
     await user.click(screen.getByRole('button', { name: 'Create Agreement' }))
-    expect(await screen.findByRole('heading', { name: 'Agreement' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Choose what matters for your home.' })).toBeInTheDocument()
+  })
+
+  it('configures clauses, updates the preview, and persists the builder before review', async () => {
+    render(<App />)
+    const user = await login()
+    await completeDemoIntake(user)
+    await user.click(screen.getByRole('button', { name: 'Create Agreement' }))
+    await screen.findByRole('heading', { name: 'Choose what matters for your home.' })
+
+    expect(screen.getAllByText(/30 days after handover/).length).toBeGreaterThan(0)
+    await user.clear(screen.getByLabelText('Refund within (days after handover)'))
+    await user.type(screen.getByLabelText('Refund within (days after handover)'), '7')
+    expect(screen.getAllByText(/within 7 days after handover/).length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: /Parking & Restoration/ }))
+    await user.click(screen.getByText('Parking included'))
+    expect(screen.getAllByText(/tenancy includes car parking/i).length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: 'Continue to Review' }))
+    expect(await screen.findByRole('heading', { name: 'Review' })).toBeInTheDocument()
+    const stored = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
+    expect(stored.agreementBuilder?.deposit.refundDays).toBe(7)
+    expect(stored.clauses.find((clause) => clause.id === 'security-deposit-refund')?.text).toContain('within 7 days')
   })
 
   it('hides Share until finalization, then exports stored state without changing the current URL', async () => {
@@ -163,6 +200,7 @@ describe('persistent multi-document journey', () => {
     const firstBrowser = render(<App />)
     const firstUser = await login()
     await completeDemoIntake(firstUser)
+    const tenantParticipantId = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement.tenant.participantId
     await finalizeDocument(firstUser)
     await firstUser.click(screen.getByRole('button', { name: 'Continue' }))
     await screen.findByRole('heading', { name: 'Stamp duty' })
@@ -187,6 +225,9 @@ describe('persistent multi-document journey', () => {
     expect(screen.getByText(/SS-STAMP-/)).toBeInTheDocument()
     expect(window.location.hash).toBe('')
     expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toContain('Bengaluru')
+    const importedAgreement = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
+    expect(importedAgreement.landlord.participantId).toBeTruthy()
+    expect(importedAgreement.landlord.participantId).not.toBe(tenantParticipantId)
     await secondUser.click(screen.getByRole('button', { name: 'Pay ₹900' }))
     expect(await screen.findByText(/stamp duty completed/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()

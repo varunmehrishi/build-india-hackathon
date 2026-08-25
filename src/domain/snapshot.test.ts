@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { zlibSync } from 'fflate'
 import { createInitialAgreementState } from './demoData'
+import { createDefaultAgreementBuilderConfiguration } from './agreementBuilder'
 import { applyIntakeDraft, demoIntakeDraft } from './intake'
 import { configureStampDutyPayment, recordStampDutyPayment } from './stampDuty'
 import {
@@ -29,6 +30,8 @@ describe('workflow snapshots', () => {
       documentName: 'कमल निवास lease',
       documentNameCustomized: true,
     }
+    original.agreement.agreementBuilder = createDefaultAgreementBuilderConfiguration()
+    original.agreement.agreementBuilder.deposit.refundDays = 7
     const result = decodeSnapshot(encodeSnapshot(original))
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.snapshot).toEqual(original)

@@ -13,10 +13,11 @@ import {
   type DemoAuthSession,
 } from './domain/auth'
 import { workflowStepOrder, workflowSteps } from './domain/demoData'
+import { generateAgreement, resolveAgreementBuilderConfiguration } from './domain/agreementBuilder'
 import { applyIntakeDraft, suggestDocumentName } from './domain/intake'
 import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
 import { configureStampDutyPayment, isStampDutyComplete, recordStampDutyPayment } from './domain/stampDuty'
-import type { IntakeDraft, WorkflowStep } from './domain/types'
+import type { AgreementBuilderConfiguration, IntakeDraft, WorkflowStep } from './domain/types'
 import {
   activeDocument,
   addNewDocument,
@@ -30,6 +31,7 @@ import {
   type StoredDocument,
 } from './domain/workspace'
 import { AuthGate } from './features/auth/AuthGate'
+import { AgreementBuilder } from './features/agreement/AgreementBuilder'
 import { ProfileMenu } from './features/auth/ProfileMenu'
 import { FinalizedView } from './features/finalized/FinalizedView'
 import { DetailsScreen } from './features/intake/DetailsScreen'
@@ -55,6 +57,14 @@ function storedRoleName(document: StoredDocument, role: 'landlord' | 'tenant'): 
   return agreementName || draftName || undefined
 }
 
+function canBindParticipant(document: StoredDocument, role: 'landlord' | 'tenant', participantId: string): boolean {
+  const assignedParticipant = document.agreement[role].participantId
+  const otherRole = role === 'landlord' ? 'tenant' : 'landlord'
+  return assignedParticipant
+    ? assignedParticipant === participantId
+    : document.agreement[otherRole].participantId !== participantId
+}
+
 function App() {
   const initialShare = useMemo(() => snapshotFromLocation(), [])
   const [workspace, setWorkspace] = useState<LocalWorkspace>(() => loadWorkspace())
@@ -68,9 +78,11 @@ function App() {
   const furthestStepIndex = document.furthestStepIndex
   const activeIndex = workflowStepOrder.indexOf(state.workflowStep)
   const activeStep = workflowSteps[activeIndex]
-  const activeRole = document.localRole
+  const storedRoleMatchesIdentity = !document.localRole || !authSession ||
+    canBindParticipant(document, document.localRole, authSession.participantId)
+  const activeRole = (storedRoleMatchesIdentity ? document.localRole : undefined)
     ?? (authSession ? roleForAgreement(authSession, state.agreementId) : undefined)
-    ?? (draft.initiator || undefined)
+    ?? (!state.intakeCompleted ? (draft.initiator || undefined) : undefined)
 
   useEffect(() => {
     let cancelled = false
@@ -81,20 +93,30 @@ function App() {
         nextWorkspace = importSnapshot(workspace, initialShare.snapshot)
         saveWorkspace(nextWorkspace)
         setWorkspace(nextWorkspace)
-        setNotice(`Shared agreement imported · revision ${initialShare.snapshot.agreement.snapshotRevision}`)
+        setNotice('Shared agreement imported into this browser.')
       }
       if (initialShare) replaceSnapshotUrl(null)
 
       if (restored) {
         const current = activeDocument(nextWorkspace)
         if (current.localRole) {
-          const name = storedRoleName(current, current.localRole)
-          restored = bindRole(
-            { ...restored, displayName: name || restored.displayName },
-            current.agreement.agreementId,
-            current.localRole,
-          )
-          saveAuthSession(restored)
+          const role = current.localRole
+          const participantId = current.agreement[role].participantId
+          if (canBindParticipant(current, role, restored.participantId)) {
+            restored = bindRole(restored, current.agreement.agreementId, role)
+            if (!participantId) {
+              nextWorkspace = updateDocument(nextWorkspace, current.agreement.agreementId, (stored) => ({
+                ...stored,
+                agreement: {
+                  ...stored.agreement,
+                  [role]: { ...stored.agreement[role], participantId: restored?.participantId },
+                },
+              }))
+              saveWorkspace(nextWorkspace)
+              setWorkspace(nextWorkspace)
+            }
+            saveAuthSession(restored)
+          }
         }
       }
       setAuthSession(restored)
@@ -144,12 +166,9 @@ function App() {
     if (!selected) return
     persistWorkspace({ ...workspace, activeDocumentId: agreementId })
     if (authSession && selected.localRole) {
-      const name = storedRoleName(selected, selected.localRole)
-      persistSession(bindRole(
-        { ...authSession, displayName: name || authSession.displayName },
-        agreementId,
-        selected.localRole,
-      ))
+      if (canBindParticipant(selected, selected.localRole, authSession.participantId)) {
+        persistSession(bindRole(authSession, agreementId, selected.localRole))
+      }
     }
     setNotice('')
     setShareSource(null)
@@ -158,12 +177,22 @@ function App() {
   function authenticate(session: DemoAuthSession) {
     let nextSession = session
     if (document.localRole) {
-      const name = storedRoleName(document, document.localRole)
-      nextSession = bindRole(
-        { ...session, displayName: name || session.displayName },
-        state.agreementId,
-        document.localRole,
-      )
+      const role = document.localRole
+      const participantId = state[role].participantId
+      if (canBindParticipant(document, role, session.participantId)) {
+        nextSession = bindRole(session, state.agreementId, role)
+        if (!participantId) {
+          mutateActiveDocument((current) => ({
+            ...current,
+            agreement: {
+              ...current.agreement,
+              [role]: { ...current.agreement[role], participantId: session.participantId },
+            },
+          }))
+        }
+      } else {
+        setNotice(`This ${role} role is already linked to the other demo identity.`)
+      }
     }
     persistSession(nextSession)
   }
@@ -293,11 +322,44 @@ function App() {
       furthestStepIndex: Math.max(current.furthestStepIndex, 2),
       agreement: {
         ...completed,
+        [role]: { ...completed[role], participantId: authSession?.participantId },
         snapshotRevision: current.agreement.snapshotRevision + 1,
         lastUpdatedBy: role,
       },
     }))
     if (authSession) persistSession(bindRole(authSession, state.agreementId, role))
+  }
+
+  function updateAgreementBuilder(configuration: AgreementBuilderConfiguration) {
+    mutateActiveDocument((current) => ({
+      ...current,
+      agreement: {
+        ...current.agreement,
+        agreementBuilder: configuration,
+        clauses: generateAgreement(current.agreement, configuration).clauses,
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: activeRole,
+      },
+    }))
+  }
+
+  function continueFromAgreement() {
+    mutateActiveDocument((current) => {
+      const configuration = resolveAgreementBuilderConfiguration(current.agreement)
+      const reviewIndex = workflowStepOrder.indexOf('review')
+      return {
+        ...current,
+        furthestStepIndex: Math.max(current.furthestStepIndex, reviewIndex),
+        agreement: {
+          ...current.agreement,
+          agreementBuilder: configuration,
+          clauses: generateAgreement(current.agreement, configuration).clauses,
+          workflowStep: 'review',
+          snapshotRevision: current.agreement.snapshotRevision + 1,
+          lastUpdatedBy: activeRole,
+        },
+      }
+    })
   }
 
   function finalizeDocument() {
@@ -438,6 +500,8 @@ function App() {
                 />
               ) : state.workflowStep === 'requirements' ? (
                 <RequirementsScreen agreement={state} />
+              ) : state.workflowStep === 'agreement' ? (
+                <AgreementBuilder agreement={state} onChange={updateAgreementBuilder} />
               ) : (
                 <Card className="stage-card">
                   <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>
@@ -445,7 +509,6 @@ function App() {
                   <div className="transaction-summary">
                     <span><small>Transaction</small><strong>{state.durationMonths}-month residential tenancy</strong></span>
                     <span><small>Location</small><strong>{state.property.city}, {state.property.state}</strong></span>
-                    <span><small>Snapshot</small><strong>Revision {state.snapshotRevision}</strong></span>
                   </div>
                   <div className="placeholder-panel">
                     <p className="placeholder-title">Coming in the next milestone</p>
@@ -457,6 +520,8 @@ function App() {
                 <Button variant="ghost" onClick={() => moveStep(-1)} disabled={state.workflowStep === 'finalized'}>Back</Button>
                 {state.workflowStep === 'review' ? (
                   <Button onClick={finalizeDocument}>Finalize document</Button>
+                ) : state.workflowStep === 'agreement' ? (
+                  <Button onClick={continueFromAgreement}>Continue to Review</Button>
                 ) : (
                   <Button
                     onClick={() => moveStep(1)}

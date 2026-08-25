@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import {
+  DEMO_IDENTITIES,
   DEMO_OTP,
+  demoIdentityForAadhaar,
   encryptAadhaar,
+  participantIdForAadhaar,
   type DemoAuthSession,
 } from '../../domain/auth'
 
@@ -71,14 +74,18 @@ export function AuthGate({ onAuthenticated, suggestedDisplayName = 'Meera Sharma
     setIsVerifying(true)
     try {
       const aadhaarDigits = identifier.replace(/\D/g, '')
-      const encryptedAadhaar = await encryptAadhaar(aadhaarDigits)
+      const [encryptedAadhaar, participantId] = await Promise.all([
+        encryptAadhaar(aadhaarDigits),
+        participantIdForAadhaar(aadhaarDigits),
+      ])
+      const demoIdentity = demoIdentityForAadhaar(aadhaarDigits)
       setIdentifier('')
       setOtp('')
       onAuthenticated({
         version: 2,
         authenticated: true,
-        participantId: crypto.randomUUID(),
-        displayName: suggestedDisplayName,
+        participantId,
+        displayName: demoIdentity?.displayName ?? suggestedDisplayName,
         roleBindings: [],
         encryptedAadhaar,
       })
@@ -143,6 +150,22 @@ export function AuthGate({ onAuthenticated, suggestedDisplayName = 'Meera Sharma
               hint="Any 12-digit number is accepted for this local simulation."
               error={error || undefined}
             />
+            <div className="demo-identity-options" aria-label="Demo Aadhaar profiles">
+              {DEMO_IDENTITIES.map((identity) => (
+                <button
+                  type="button"
+                  key={identity.aadhaar}
+                  aria-label={`Prefill ${identity.displayName} Aadhaar ${formatAadhaar(identity.aadhaar)}`}
+                  onClick={() => {
+                    setIdentifier(formatAadhaar(identity.aadhaar))
+                    setError('')
+                  }}
+                >
+                  <span><strong>{identity.displayName}</strong><small>{identity.roleLabel} demo</small></span>
+                  <span>{formatAadhaar(identity.aadhaar)}</span>
+                </button>
+              ))}
+            </div>
             <Button type="submit">Send OTP</Button>
           </form>
         ) : (
@@ -176,9 +199,9 @@ export function AuthGate({ onAuthenticated, suggestedDisplayName = 'Meera Sharma
         )}
 
         <p className="auth-disclaimer">
-          Static hackathon simulation only. The number is encrypted in this browser and is never
-          included in shared agreement links. This experience is not connected to UIDAI or any
-          government service.
+          Static hackathon simulation only. The number creates a stable demo identity and is
+          encrypted in this browser. This experience is not connected to UIDAI or any government
+          service.
         </p>
       </div>
     </div>

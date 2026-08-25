@@ -30,7 +30,6 @@ export function FinalizedView({ agreement, localRole }: FinalizedViewProps) {
         <div className="document-meta">
           <span><small>Your role</small><strong>{localRole ? roleLabel(localRole) : 'Not assigned'}</strong></span>
           <span><small>Version</small><strong>{agreement.agreementVersion}</strong></span>
-          <span><small>Revision</small><strong>{agreement.snapshotRevision}</strong></span>
         </div>
 
         <section className="finalized-section">

@@ -1,4 +1,5 @@
 import { Unzlib, zlibSync } from 'fflate'
+import { isAgreementBuilderConfiguration } from './agreementBuilder'
 import type { AgreementState, PartyRole, StampDutyContribution, WorkflowStep } from './types'
 
 export const SNAPSHOT_FRAGMENT_KEY = 'share'
@@ -70,6 +71,7 @@ function isParty(value: unknown, role: PartyRole): boolean {
   return (
     party.id === role &&
     typeof party.name === 'string' &&
+    (party.participantId === undefined || typeof party.participantId === 'string') &&
     typeof party.identityVerified === 'boolean' &&
     typeof party.approvedAgreement === 'boolean' &&
     typeof party.signed === 'boolean'
@@ -147,6 +149,7 @@ export function isAgreementState(value: unknown): value is AgreementState {
     isParty(state.tenant, 'tenant') &&
     Array.isArray(state.clauses) &&
     state.clauses.every(isClause) &&
+    (state.agreementBuilder === undefined || isAgreementBuilderConfiguration(state.agreementBuilder)) &&
     !!state.requirements &&
     typeof state.requirements.stampDutyAmount === 'number' &&
     typeof state.requirements.registrationRequired === 'boolean' &&

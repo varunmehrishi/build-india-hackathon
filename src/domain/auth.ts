@@ -4,6 +4,11 @@ export const AUTH_STORAGE_KEY = 'build-india-demo-session-v2'
 export const LEGACY_AUTH_STORAGE_KEY = 'build-india-demo-session-v1'
 export const DEMO_OTP = '482913'
 
+export const DEMO_IDENTITIES = [
+  { aadhaar: '111122223333', displayName: 'Meera Sharma', roleLabel: 'Tenant' },
+  { aadhaar: '444455556666', displayName: 'Arjun Rao', roleLabel: 'Landlord' },
+] as const
+
 const VAULT_DATABASE = 'build-india-identity-vault'
 const VAULT_STORE = 'keys'
 const VAULT_KEY_ID = 'aadhaar-aes-gcm-v1'
@@ -98,6 +103,18 @@ export async function encryptAadhaar(value: string): Promise<EncryptedAadhaarRec
     iv: bytesToBase64(iv),
     keyId: VAULT_KEY_ID,
   }
+}
+
+export async function participantIdForAadhaar(value: string): Promise<string> {
+  const digits = value.replace(/\D/g, '')
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`saral-setu:${digits}`))
+  const identifier = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `participant-${identifier.slice(0, 24)}`
+}
+
+export function demoIdentityForAadhaar(value: string): typeof DEMO_IDENTITIES[number] | undefined {
+  const digits = value.replace(/\D/g, '')
+  return DEMO_IDENTITIES.find((identity) => identity.aadhaar === digits)
 }
 
 function isValidSession(value: unknown): value is DemoAuthSession {
