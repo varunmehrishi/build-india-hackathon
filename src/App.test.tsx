@@ -280,7 +280,7 @@ describe('persistent multi-document journey', () => {
     expect(await screen.findByRole('heading', { name: 'Verify the people signing' })).toBeInTheDocument()
   })
 
-  it('verifies both viewed parties for the final version before continuing to Notary', async () => {
+  it('verifies both viewed parties, completes notarisation, and continues to eSign', async () => {
     render(<App />)
     const user = await login()
     await completeDemoIntake(user)
@@ -308,7 +308,28 @@ describe('persistent multi-document journey', () => {
     expect(stored.tenant.identityVerifiedVersion).toBe(stored.agreementVersion)
 
     await user.click(screen.getByRole('button', { name: 'Continue' }))
-    expect(await screen.findByRole('heading', { name: 'Notary' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Notarisation' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Optional for this agreement' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add Notarisation' }))
+    expect(await screen.findByRole('heading', { name: 'Your Notary' })).toBeInTheDocument()
+    expect(screen.getByText('Adv. A. Sharma')).toBeInTheDocument()
+    expect(screen.getByText('Registration: DEMO-001')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Join Session' }))
+    expect(await screen.findByRole('heading', { name: 'Ready for attestation' })).toBeInTheDocument()
+    expect(screen.getAllByText('✓ Verified')).toHaveLength(2)
+    expect(screen.getByText('✓ Completed')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Attest Agreement' }))
+    expect(await screen.findByRole('heading', { name: 'Notarial attestation completed' })).toBeInTheDocument()
+
+    const notarized = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
+    expect(notarized.notarizationStatus).toBe('completed')
+    expect(notarized.notaryDisplayName).toBe('Adv. A. Sharma')
+    expect(notarized.notaryRegistrationId).toBe('DEMO-001')
+    expect(notarized.notarizedAgreementVersion).toBe(notarized.agreementVersion)
+    expect(notarized.notarizationCompletedAt).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Continue to Sign' }))
+    expect(await screen.findByRole('heading', { name: 'eSign' })).toBeInTheDocument()
   })
 
   it('executes the remaining steps while keeping pre-finalization steps locked', async () => {
@@ -319,7 +340,7 @@ describe('persistent multi-document journey', () => {
 
     expect(screen.getByRole('button', { name: /5\. Review, locked/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
-    for (const heading of ['Stamp duty', 'Verify the people signing', 'Notary', 'eSign', 'Completion']) {
+    for (const heading of ['Stamp duty', 'Verify the people signing', 'Notarisation']) {
       await user.click(screen.getByRole('button', { name: 'Continue' }))
       await screen.findByRole('heading', { name: heading })
       if (heading === 'Stamp duty') {
@@ -334,6 +355,14 @@ describe('persistent multi-document journey', () => {
       }
       expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     }
+
+    await user.click(screen.getByRole('button', { name: 'Skip' }))
+    expect(await screen.findByRole('heading', { name: 'eSign' })).toBeInTheDocument()
+    const skipped = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
+    expect(skipped.notarizationStatus).toBe('skipped')
+    expect(skipped.notarized).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('heading', { name: 'Completion' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByRole('heading', { name: 'eSign' })).toBeInTheDocument()

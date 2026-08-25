@@ -510,6 +510,29 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .identity-ready-panel.complete > span { background: #dcefe3; color: #207044; }
 .identity-verification-layer .auth-dialog { width: min(500px, 100%); max-height: calc(100vh - 40px); overflow: auto; }
 
+.notary-card { display: grid; gap: 24px; padding: clamp(24px, 5vw, 42px); }
+.notary-card h1 { font-size: clamp(2.4rem, 5vw, 4rem); }
+.notary-decision-card, .notary-result-card { justify-items: start; }
+.notary-decision-card .stage-description { max-width: 48ch; }
+.notary-icon, .notary-success-mark, .notary-skip-mark { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 18px; background: var(--accent-soft); color: var(--accent-dark); font: 800 1.25rem 'Inter', system-ui, sans-serif; }
+.notary-success-mark { border-radius: 50%; background: #dcefe3; color: #207044; }
+.notary-skip-mark { border-radius: 50%; background: #eef0ed; color: var(--muted); }
+.notary-demo-note { margin: 0; padding: 13px 15px; border: 1px solid #eedda9; border-radius: 14px; background: #fff8e6; color: #73501c; font-size: .8rem; line-height: 1.5; }
+.notary-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.notary-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.notary-profile { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 15px; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: #fbfcfa; }
+.notary-profile > div:last-child { display: grid; gap: 4px; }
+.notary-profile h2 { font: 750 1.15rem 'Inter', system-ui, sans-serif; letter-spacing: 0; }
+.notary-profile p { margin: 0; color: var(--muted); }
+.notary-profile small, .notary-session-profile small, .notary-completion-evidence small, .notary-checkpoints small { color: var(--muted); }
+.notary-avatar { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; background: linear-gradient(145deg, #f0a94c, #f6ca80); color: #4d3619; font-weight: 850; }
+.notary-session-profile { display: flex; align-items: center; gap: 13px; padding: 15px; border-radius: 16px; background: var(--cream); }
+.notary-session-profile > span { display: grid; gap: 3px; }
+.notary-checkpoints, .notary-completion-evidence { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.notary-checkpoints > span, .notary-completion-evidence > span { display: grid; gap: 5px; min-width: 0; padding: 15px; border: 1px solid var(--border); border-radius: 15px; background: #fbfcfa; }
+.notary-checkpoints strong, .notary-completion-evidence strong { overflow-wrap: anywhere; font-size: .86rem; }
+.notary-blocked { margin: 0; padding: 13px 15px; border-radius: 14px; background: #fff2f1; color: var(--danger); font-size: .82rem; }
+
 .finalized-content { width: 100%; }
 .finalized-card { display: grid; gap: 24px; padding: clamp(24px, 5vw, 44px); }
 .finalized-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
@@ -608,6 +631,10 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .identity-version-banner { align-items: flex-start; flex-direction: column; }
   .identity-party-heading { grid-template-columns: auto minmax(0, 1fr); }
   .identity-party-heading .badge { grid-column: 2; }
+  .notary-heading { flex-direction: column; }
+  .notary-checkpoints, .notary-completion-evidence { grid-template-columns: 1fr; }
+  .notary-actions { width: 100%; }
+  .notary-actions .btn { flex: 1 1 100%; }
   .custom-split .btn { width: 100%; }
   .journey-preview ol { grid-template-columns: 1fr; gap: 9px; }
   .journey-preview li { grid-template-columns: auto 1fr; align-items: center; justify-items: start; text-align: left; }

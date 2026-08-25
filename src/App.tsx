@@ -20,6 +20,7 @@ import {
   clearExecutionVerification,
   verifyPartyForExecution,
 } from './domain/identityVerification'
+import { attestAgreement, isNotarizationResolved, skipNotarization } from './domain/notarization'
 import { finalizeReviewedAgreement, resolveReviewState } from './domain/review'
 import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
 import { configureStampDutyPayment, isStampDutyComplete, recordStampDutyPayment } from './domain/stampDuty'
@@ -43,6 +44,7 @@ import { FinalizedView } from './features/finalized/FinalizedView'
 import { DetailsScreen } from './features/intake/DetailsScreen'
 import { IntentScreen } from './features/intake/IntentScreen'
 import { IdentityVerificationScreen } from './features/identity/IdentityVerificationScreen'
+import { NotarizationScreen } from './features/notary/NotarizationScreen'
 import { RequirementsScreen } from './features/requirements/RequirementsScreen'
 import { AgreementReview } from './features/review/AgreementReview'
 import { ShareDialog } from './features/sharing/ShareDialog'
@@ -52,6 +54,8 @@ type AuthState = DemoAuthSession | null | undefined
 const finalizedStepIndex = workflowStepOrder.indexOf('finalized')
 const stampStepIndex = workflowStepOrder.indexOf('stamp')
 const identityStepIndex = workflowStepOrder.indexOf('identity')
+const notaryStepIndex = workflowStepOrder.indexOf('notary')
+const signStepIndex = workflowStepOrder.indexOf('sign')
 
 function roleName(snapshot: WorkflowSnapshotEnvelope | null): string | undefined {
   if (!snapshot?.invitedRole) return undefined
@@ -222,6 +226,7 @@ function App() {
     if (state.finalized && nextIndex < finalizedStepIndex) return
     if (state.finalized && !state.stampCompleted && nextIndex > stampStepIndex) return
     if (nextIndex > identityStepIndex && !areBothPartiesVerified(state)) return
+    if (nextIndex > notaryStepIndex && !isNotarizationResolved(state)) return
     mutateActiveDocument((current) => ({
       ...current,
       agreement: {
@@ -237,6 +242,7 @@ function App() {
 
   function moveStep(offset: number) {
     if (offset > 0 && state.workflowStep === 'identity' && !areBothPartiesVerified(state)) return
+    if (offset > 0 && state.workflowStep === 'notary' && !isNotarizationResolved(state)) return
     const minimumIndex = state.finalized ? finalizedStepIndex : 0
     const nextIndex = Math.max(minimumIndex, Math.min(workflowSteps.length - 1, activeIndex + offset))
     mutateActiveDocument((current) => ({
@@ -364,6 +370,12 @@ function App() {
           tenant: returningFromReview
             ? { ...clearExecutionVerification(current.agreement.tenant), approvedAgreement: false }
             : current.agreement.tenant,
+          notarizationStatus: returningFromReview ? 'not_started' : current.agreement.notarizationStatus,
+          notarized: returningFromReview ? false : current.agreement.notarized,
+          notaryDisplayName: returningFromReview ? undefined : current.agreement.notaryDisplayName,
+          notaryRegistrationId: returningFromReview ? undefined : current.agreement.notaryRegistrationId,
+          notarizationCompletedAt: returningFromReview ? undefined : current.agreement.notarizationCompletedAt,
+          notarizedAgreementVersion: returningFromReview ? undefined : current.agreement.notarizedAgreementVersion,
           snapshotRevision: current.agreement.snapshotRevision + 1,
           lastUpdatedBy: activeRole,
         },
@@ -487,6 +499,50 @@ function App() {
     setNotice(`${state[role].name} is verified for Agreement Version ${state.agreementVersion}.`)
   }
 
+  function continueFromNotary(nextAgreement: AgreementState, message: string) {
+    mutateActiveDocument((current) => ({
+      ...current,
+      furthestStepIndex: Math.max(current.furthestStepIndex, signStepIndex),
+      agreement: {
+        ...nextAgreement,
+        workflowStep: 'sign',
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: activeRole,
+      },
+    }))
+    setNotice(message)
+  }
+
+  function skipNotary() {
+    if (state.workflowStep !== 'notary') return
+    const skipped = skipNotarization(state)
+    if (skipped === state) return
+    continueFromNotary(skipped, 'Notarisation skipped. You can continue with eSign.')
+  }
+
+  function completeNotaryAttestation() {
+    if (state.workflowStep !== 'notary') return
+    const completed = attestAgreement(state)
+    if (completed === state) {
+      setNotice('Both parties must be verified before attestation.')
+      return
+    }
+    mutateActiveDocument((current) => ({
+      ...current,
+      agreement: {
+        ...completed,
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: activeRole,
+      },
+    }))
+    setNotice('Notarial attestation completed for this agreement version.')
+  }
+
+  function continueToSign() {
+    if (state.workflowStep !== 'notary' || !isNotarizationResolved(state)) return
+    continueFromNotary(state, 'Notarisation checkpoint complete. Continue with eSign.')
+  }
+
   function openShare() {
     const storedWorkspace = loadWorkspace()
     const storedDocument = storedWorkspace.documents[state.agreementId]
@@ -570,6 +626,13 @@ function App() {
                   onViewingRoleChange={updateIdentityViewingRole}
                   onVerify={verifyIdentity}
                 />
+              ) : state.workflowStep === 'notary' ? (
+                <NotarizationScreen
+                  agreement={state}
+                  onSkip={skipNotary}
+                  onAttest={completeNotaryAttestation}
+                  onContinue={continueToSign}
+                />
               ) : state.workflowStep === 'requirements' ? (
                 <RequirementsScreen agreement={state} />
               ) : state.workflowStep === 'agreement' ? (
@@ -590,7 +653,7 @@ function App() {
                   </div>
                 </Card>
               )}
-              <div className="journey-actions">
+              {state.workflowStep === 'notary' ? null : <div className="journey-actions">
                 <Button variant="ghost" onClick={() => moveStep(-1)} disabled={state.workflowStep === 'finalized'}>Back</Button>
                 {state.workflowStep === 'review' ? null : state.workflowStep === 'agreement' ? (
                   <Button onClick={continueFromAgreement}>Continue to Review</Button>
@@ -604,7 +667,7 @@ function App() {
                     }
                   >{state.workflowStep === 'requirements' ? 'Create Agreement' : 'Continue'}</Button>
                 )}
-              </div>
+              </div>}
             </main>
           </div>
         )}

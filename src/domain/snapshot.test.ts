@@ -37,6 +37,12 @@ describe('workflow snapshots', () => {
     original.agreement.landlord.identityVerified = true
     original.agreement.landlord.identityVerifiedVersion = original.agreement.agreementVersion
     original.agreement.landlord.identityVerifiedAt = '2026-08-26T10:00:00.000Z'
+    original.agreement.notarizationStatus = 'completed'
+    original.agreement.notarized = true
+    original.agreement.notaryDisplayName = 'Adv. A. Sharma'
+    original.agreement.notaryRegistrationId = 'DEMO-001'
+    original.agreement.notarizationCompletedAt = '2026-08-26T14:44:00.000Z'
+    original.agreement.notarizedAgreementVersion = original.agreement.agreementVersion
     original.agreement.clauses = [{
       id: 'security-deposit-refund',
       title: 'Security Deposit',

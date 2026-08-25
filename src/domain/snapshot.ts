@@ -204,6 +204,13 @@ export function isAgreementState(value: unknown): value is AgreementState {
     (state.finalizedAt === undefined || typeof state.finalizedAt === 'string') &&
     (state.stampDutyPayment === undefined || isStampDutyPayment(state.stampDutyPayment, state.requirements.stampDutyAmount)) &&
     typeof state.stampCompleted === 'boolean' &&
+    (state.notarizationStatus === undefined || ['not_started', 'skipped', 'completed'].includes(state.notarizationStatus)) &&
+    (state.notaryDisplayName === undefined || typeof state.notaryDisplayName === 'string') &&
+    (state.notaryRegistrationId === undefined || typeof state.notaryRegistrationId === 'string') &&
+    (state.notarizationCompletedAt === undefined || typeof state.notarizationCompletedAt === 'string') &&
+    (state.notarizedAgreementVersion === undefined || (
+      typeof state.notarizedAgreementVersion === 'number' && Number.isInteger(state.notarizedAgreementVersion) && state.notarizedAgreementVersion > 0
+    )) &&
     typeof state.notarized === 'boolean' &&
     (state.lastUpdatedBy === undefined || isPartyRole(state.lastUpdatedBy))
   )

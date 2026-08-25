@@ -13,6 +13,8 @@ export type WorkflowStep =
 
 export type PartyRole = 'landlord' | 'tenant'
 
+export type NotarizationStatus = 'not_started' | 'skipped' | 'completed'
+
 export type StampContributionStatus = 'not-required' | 'pending' | 'paid'
 
 export interface StampDutyContribution {
@@ -238,6 +240,11 @@ export interface AgreementState {
   finalizedAt?: string
   stampDutyPayment?: StampDutyPaymentState
   stampCompleted: boolean
+  notarizationStatus?: NotarizationStatus
+  notaryDisplayName?: string
+  notaryRegistrationId?: string
+  notarizationCompletedAt?: string
+  notarizedAgreementVersion?: number
   notarized: boolean
 }
 

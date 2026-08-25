@@ -190,6 +190,7 @@ export function createInitialAgreementState(): AgreementState {
     agreementVersion: 1,
     finalized: false,
     stampCompleted: false,
+    notarizationStatus: 'not_started',
     notarized: false,
   }
 }
