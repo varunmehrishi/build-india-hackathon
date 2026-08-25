@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge } from './components/ui/Badge'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
@@ -23,6 +23,13 @@ import {
 import { attestAgreement, isNotarizationResolved, skipNotarization } from './domain/notarization'
 import { finalizeReviewedAgreement, resolveReviewState } from './domain/review'
 import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
+import {
+  areAllSignaturesComplete,
+  hasAnySignature,
+  prepareAgreementForSigning,
+  recordSignature,
+  recordSignatureCancellation,
+} from './domain/signing'
 import { configureStampDutyPayment, isStampDutyComplete, recordStampDutyPayment } from './domain/stampDuty'
 import type { AgreementBuilderConfiguration, AgreementState, IntakeDraft, WorkflowStep } from './domain/types'
 import {
@@ -49,6 +56,7 @@ import { RequirementsScreen } from './features/requirements/RequirementsScreen'
 import { AgreementReview } from './features/review/AgreementReview'
 import { ShareDialog } from './features/sharing/ShareDialog'
 import { StampDutyScreen } from './features/stamp/StampDutyScreen'
+import { ESignScreen } from './features/signing/ESignScreen'
 
 type AuthState = DemoAuthSession | null | undefined
 const finalizedStepIndex = workflowStepOrder.indexOf('finalized')
@@ -100,6 +108,7 @@ function App() {
     ?? state.review?.currentRole
     ?? activeRole
     ?? state.initiator
+  const signingRole = state.signingRole ?? state.identityVerificationRole ?? state.initiator
 
   useEffect(() => {
     let cancelled = false
@@ -227,6 +236,7 @@ function App() {
     if (state.finalized && !state.stampCompleted && nextIndex > stampStepIndex) return
     if (nextIndex > identityStepIndex && !areBothPartiesVerified(state)) return
     if (nextIndex > notaryStepIndex && !isNotarizationResolved(state)) return
+    if (nextIndex > signStepIndex && !areAllSignaturesComplete(state)) return
     mutateActiveDocument((current) => ({
       ...current,
       agreement: {
@@ -243,6 +253,7 @@ function App() {
   function moveStep(offset: number) {
     if (offset > 0 && state.workflowStep === 'identity' && !areBothPartiesVerified(state)) return
     if (offset > 0 && state.workflowStep === 'notary' && !isNotarizationResolved(state)) return
+    if (offset > 0 && state.workflowStep === 'sign' && !areAllSignaturesComplete(state)) return
     const minimumIndex = state.finalized ? finalizedStepIndex : 0
     const nextIndex = Math.max(minimumIndex, Math.min(workflowSteps.length - 1, activeIndex + offset))
     mutateActiveDocument((current) => ({
@@ -352,6 +363,10 @@ function App() {
   }
 
   function updateAgreementBuilder(configuration: AgreementBuilderConfiguration) {
+    if (state.finalized || hasAnySignature(state)) {
+      setNotice('This agreement has entered execution and can no longer be edited.')
+      return
+    }
     mutateActiveDocument((current) => {
       const returningFromReview = Boolean(current.agreement.review)
       return {
@@ -405,6 +420,10 @@ function App() {
   }
 
   function updateAgreementReview(nextAgreement: AgreementState) {
+    if (state.finalized || hasAnySignature(state)) {
+      setNotice('This agreement has entered execution and can no longer be changed.')
+      return
+    }
     mutateActiveDocument((current) => ({
       ...current,
       agreement: {
@@ -543,6 +562,81 @@ function App() {
     continueFromNotary(state, 'Notarisation checkpoint complete. Continue with eSign.')
   }
 
+  const prepareSigning = useCallback(async () => {
+    const prepared = await prepareAgreementForSigning(state)
+    if (!prepared.finalDocumentHash || state.finalDocumentHash) return
+    mutateActiveDocument((current) => {
+      if (current.agreement.finalDocumentHash || current.agreement.agreementVersion !== prepared.agreementVersion) return current
+      return {
+        ...current,
+        agreement: {
+          ...prepared,
+          snapshotRevision: current.agreement.snapshotRevision + 1,
+          lastUpdatedBy: signingRole,
+        },
+      }
+    })
+  // Mutations intentionally use the active agreement captured for this signing screen.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, signingRole])
+
+  function updateSigningRole(role: 'landlord' | 'tenant') {
+    if (state.workflowStep !== 'sign') return
+    mutateActiveDocument((current) => ({
+      ...current,
+      agreement: {
+        ...current.agreement,
+        signingRole: role,
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: role,
+      },
+    }))
+  }
+
+  async function signAgreement(role: 'landlord' | 'tenant'): Promise<boolean> {
+    if (state.workflowStep !== 'sign' || role !== signingRole) return false
+    const signed = await recordSignature(state, role)
+    const signatureField = role === 'landlord' ? 'landlordSignature' : 'tenantSignature'
+    if (!signed[signatureField] || signed[signatureField] === state[signatureField]) return false
+    mutateActiveDocument((current) => ({
+      ...current,
+      agreement: {
+        ...signed,
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: role,
+      },
+    }))
+    setNotice(`${state[role].name} signed Version ${state.agreementVersion}.`)
+    return true
+  }
+
+  function cancelSigning(role: 'landlord' | 'tenant') {
+    if (state.workflowStep !== 'sign' || role !== signingRole) return
+    mutateActiveDocument((current) => ({
+      ...current,
+      agreement: {
+        ...recordSignatureCancellation(current.agreement, role),
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: role,
+      },
+    }))
+  }
+
+  function continueFromSigning() {
+    if (state.workflowStep !== 'sign' || !areAllSignaturesComplete(state)) return
+    mutateActiveDocument((current) => ({
+      ...current,
+      furthestStepIndex: Math.max(current.furthestStepIndex, workflowStepOrder.indexOf('complete')),
+      agreement: {
+        ...current.agreement,
+        workflowStep: 'complete',
+        snapshotRevision: current.agreement.snapshotRevision + 1,
+        lastUpdatedBy: current.agreement.signingRole ?? activeRole,
+      },
+    }))
+    setNotice('Both parties signed the same final agreement.')
+  }
+
   function openShare() {
     const storedWorkspace = loadWorkspace()
     const storedDocument = storedWorkspace.documents[state.agreementId]
@@ -633,6 +727,17 @@ function App() {
                   onAttest={completeNotaryAttestation}
                   onContinue={continueToSign}
                 />
+              ) : state.workflowStep === 'sign' ? (
+                <ESignScreen
+                  key={signingRole}
+                  agreement={state}
+                  signingRole={signingRole}
+                  onPrepare={prepareSigning}
+                  onRoleChange={updateSigningRole}
+                  onSign={signAgreement}
+                  onCancel={cancelSigning}
+                  onContinue={continueFromSigning}
+                />
               ) : state.workflowStep === 'requirements' ? (
                 <RequirementsScreen agreement={state} />
               ) : state.workflowStep === 'agreement' ? (
@@ -653,7 +758,7 @@ function App() {
                   </div>
                 </Card>
               )}
-              {state.workflowStep === 'notary' ? null : <div className="journey-actions">
+              {state.workflowStep === 'notary' || state.workflowStep === 'sign' ? null : <div className="journey-actions">
                 <Button variant="ghost" onClick={() => moveStep(-1)} disabled={state.workflowStep === 'finalized'}>Back</Button>
                 {state.workflowStep === 'review' ? null : state.workflowStep === 'agreement' ? (
                   <Button onClick={continueFromAgreement}>Continue to Review</Button>

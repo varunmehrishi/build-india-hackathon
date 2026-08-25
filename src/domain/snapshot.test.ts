@@ -43,6 +43,25 @@ describe('workflow snapshots', () => {
     original.agreement.notaryRegistrationId = 'DEMO-001'
     original.agreement.notarizationCompletedAt = '2026-08-26T14:44:00.000Z'
     original.agreement.notarizedAgreementVersion = original.agreement.agreementVersion
+    original.agreement.finalDocumentHash = 'a'.repeat(64)
+    original.agreement.documentId = 'AAAA-AAAA-AAAA'
+    original.agreement.signingRole = 'tenant'
+    original.agreement.signingStatus = 'partially-signed'
+    original.agreement.tenantSignature = {
+      signerRole: 'tenant',
+      signerName: 'Meera Sharma',
+      signedVersion: original.agreement.agreementVersion,
+      signedDocumentHash: 'a'.repeat(64),
+      signedAt: '2026-08-26T14:48:00.000Z',
+      signatureReference: 'SIG-DEMO-A73F',
+    }
+    original.agreement.signingEvents = [{
+      id: 'signature-completed-1',
+      type: 'signature-completed',
+      actor: 'tenant',
+      timestamp: '2026-08-26T14:48:00.000Z',
+      message: 'Meera Sharma signed Version 1',
+    }]
     original.agreement.clauses = [{
       id: 'security-deposit-refund',
       title: 'Security Deposit',

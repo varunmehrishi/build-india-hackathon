@@ -108,11 +108,11 @@ export const workflowSteps: readonly WorkflowStepConfig[] = [
     id: 'sign',
     title: 'eSign',
     kicker: 'Sign and seal',
-    description: 'Prepare a believable signing flow for both parties.',
+    description: 'Record each verified party’s consent to the exact finalized agreement.',
     placeholderPoints: [
-      'Apply a simulated signature state.',
-      'Sequential signing for landlord and tenant.',
-      'Success feedback without external providers.',
+      'Real SHA-256 fingerprint for the finalized document.',
+      'Sequential, version-bound Demo eSign records.',
+      'Document integrity and signing audit events.',
     ],
   },
   {

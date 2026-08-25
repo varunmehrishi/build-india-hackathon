@@ -1,6 +1,6 @@
 import { Unzlib, zlibSync } from 'fflate'
 import { isAgreementBuilderConfiguration } from './agreementBuilder'
-import type { AgreementReviewState, AgreementState, PartyRole, StampDutyContribution, WorkflowStep } from './types'
+import type { AgreementReviewState, AgreementState, PartyRole, SignatureRecord, SigningEvent, StampDutyContribution, WorkflowStep } from './types'
 
 export const SNAPSHOT_FRAGMENT_KEY = 'share'
 export const MAX_ENCODED_SNAPSHOT_LENGTH = 64 * 1024
@@ -163,6 +163,27 @@ function isStampDutyPayment(value: unknown, totalAmount: number): boolean {
   )
 }
 
+function isSignatureRecord(value: unknown): value is SignatureRecord {
+  if (!value || typeof value !== 'object') return false
+  const signature = value as Record<string, unknown>
+  return isPartyRole(signature.signerRole) &&
+    typeof signature.signerName === 'string' &&
+    typeof signature.signedVersion === 'number' && Number.isInteger(signature.signedVersion) && signature.signedVersion > 0 &&
+    typeof signature.signedDocumentHash === 'string' && /^[a-f0-9]{64}$/.test(signature.signedDocumentHash) &&
+    typeof signature.signedAt === 'string' &&
+    typeof signature.signatureReference === 'string'
+}
+
+function isSigningEvent(value: unknown): value is SigningEvent {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return typeof item.id === 'string' &&
+    ['signing-started', 'signature-completed', 'signature-cancelled', 'all-signatures-completed'].includes(String(item.type)) &&
+    (item.actor === undefined || isPartyRole(item.actor)) &&
+    typeof item.timestamp === 'string' &&
+    typeof item.message === 'string'
+}
+
 export function isAgreementState(value: unknown): value is AgreementState {
   if (!value || typeof value !== 'object') return false
   const state = value as Partial<AgreementState>
@@ -212,6 +233,13 @@ export function isAgreementState(value: unknown): value is AgreementState {
       typeof state.notarizedAgreementVersion === 'number' && Number.isInteger(state.notarizedAgreementVersion) && state.notarizedAgreementVersion > 0
     )) &&
     typeof state.notarized === 'boolean' &&
+    (state.finalDocumentHash === undefined || (typeof state.finalDocumentHash === 'string' && /^[a-f0-9]{64}$/.test(state.finalDocumentHash))) &&
+    (state.documentId === undefined || (typeof state.documentId === 'string' && /^[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(state.documentId))) &&
+    (state.signingRole === undefined || isPartyRole(state.signingRole)) &&
+    (state.landlordSignature === undefined || isSignatureRecord(state.landlordSignature)) &&
+    (state.tenantSignature === undefined || isSignatureRecord(state.tenantSignature)) &&
+    (state.signingStatus === undefined || ['not-started', 'partially-signed', 'complete'].includes(state.signingStatus)) &&
+    (state.signingEvents === undefined || (Array.isArray(state.signingEvents) && state.signingEvents.every(isSigningEvent))) &&
     (state.lastUpdatedBy === undefined || isPartyRole(state.lastUpdatedBy))
   )
 }

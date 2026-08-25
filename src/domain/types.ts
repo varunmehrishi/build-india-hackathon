@@ -15,6 +15,31 @@ export type PartyRole = 'landlord' | 'tenant'
 
 export type NotarizationStatus = 'not_started' | 'skipped' | 'completed'
 
+export type SigningStatus = 'not-started' | 'partially-signed' | 'complete'
+
+export type SigningEventType =
+  | 'signing-started'
+  | 'signature-completed'
+  | 'signature-cancelled'
+  | 'all-signatures-completed'
+
+export interface SignatureRecord {
+  signerRole: PartyRole
+  signerName: string
+  signedVersion: number
+  signedDocumentHash: string
+  signedAt: string
+  signatureReference: string
+}
+
+export interface SigningEvent {
+  id: string
+  type: SigningEventType
+  actor?: PartyRole
+  timestamp: string
+  message: string
+}
+
 export type StampContributionStatus = 'not-required' | 'pending' | 'paid'
 
 export interface StampDutyContribution {
@@ -246,6 +271,13 @@ export interface AgreementState {
   notarizationCompletedAt?: string
   notarizedAgreementVersion?: number
   notarized: boolean
+  finalDocumentHash?: string
+  documentId?: string
+  signingRole?: PartyRole
+  landlordSignature?: SignatureRecord
+  tenantSignature?: SignatureRecord
+  signingStatus?: SigningStatus
+  signingEvents?: SigningEvent[]
 }
 
 export interface IntakeDraft {

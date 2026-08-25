@@ -577,6 +577,71 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .receipt { display: grid; grid-template-columns: 1.3fr .7fr 1.5fr 1fr; gap: 12px; padding: 15px; border: 1px solid var(--border); border-radius: 15px; background: #fbfcfa; }
 .receipt strong { overflow-wrap: anywhere; font-size: .78rem; }
 
+.esign-screen { display: grid; gap: 18px; }
+.esign-card { display: grid; gap: 23px; padding: clamp(24px, 5vw, 42px); }
+.esign-card h1 { font-size: clamp(2.4rem, 5vw, 4rem); }
+.esign-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.esign-ready-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.esign-ready-grid > span { display: grid; gap: 5px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 15px; background: #fbfcfa; }
+.esign-ready-grid > span:first-child { grid-column: 1 / -1; }
+.esign-ready-grid small, .esign-ready-grid em, .esign-detail-list small, .esign-integrity-grid small { color: var(--muted); }
+.esign-ready-grid strong { overflow-wrap: anywhere; }
+.esign-ready-grid em { font-size: .75rem; font-style: normal; }
+.esign-same-version-note { margin: 0; padding: 14px 16px; border: 1px solid #b9ddc5; border-radius: 14px; background: #f1f8f5; color: #207044; font-size: .8rem; line-height: 1.55; }
+.esign-details { border: 1px solid var(--border); border-radius: 15px; background: #fbfcfa; }
+.esign-details summary { padding: 14px 16px; color: var(--accent-dark); font-size: .82rem; font-weight: 800; cursor: pointer; }
+.esign-details[open] summary { border-bottom: 1px solid var(--border); }
+.esign-detail-list, .esign-integrity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 16px; }
+.esign-detail-list > span, .esign-integrity-grid > span { display: grid; gap: 4px; min-width: 0; }
+.esign-detail-list .wide { grid-column: 1 / -1; }
+.esign-detail-list code { overflow-wrap: anywhere; color: #3f4945; font-size: .68rem; line-height: 1.5; }
+.esign-integrity-result { padding: 0 16px 14px; }
+.esign-consent { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 12px; padding: 16px; border: 1px solid #b9d8cf; border-radius: 16px; background: var(--accent-soft); cursor: pointer; }
+.esign-consent input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); }
+.esign-consent > span { display: grid; gap: 4px; }
+.esign-consent small { color: var(--muted); font-size: .75rem; line-height: 1.45; }
+.esign-loading { grid-template-columns: auto 1fr; align-items: center; }
+.esign-loading p { margin: 5px 0 0; color: var(--muted); }
+.esign-pulse, .esign-secure-mark { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 18px; background: var(--accent-soft); color: var(--accent-dark); font-weight: 900; }
+.esign-ceremony-card { justify-items: start; }
+.esign-ceremony-summary { width: 100%; display: grid; gap: 5px; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: var(--cream); }
+.esign-ceremony-summary > strong { font: 700 1.5rem 'Fraunces', Georgia, serif; }
+.esign-ceremony-summary > small { margin-top: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+.esign-ceremony-summary h2 { margin: 0; font-size: 1.35rem; }
+.esign-ceremony-steps { width: 100%; margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
+.esign-ceremony-steps li { display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 9px; padding: 11px 13px; border-radius: 12px; background: #f4f5f2; color: var(--muted); font-size: .82rem; }
+.esign-ceremony-steps li.done { background: #e9f6ed; color: #207044; font-weight: 700; }
+.esign-ceremony-steps li.active { color: var(--text); font-weight: 700; }
+.esign-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.esign-complete-card { justify-items: start; }
+.esign-success-mark { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 50%; background: #dcefe3; color: #207044; font-size: 1.4rem; font-weight: 900; }
+.esign-signed-evidence { display: grid; gap: 5px; padding: 17px; border-radius: 16px; background: #f1f8f5; color: #207044; }
+.esign-signed-evidence strong { font-size: 1.1rem; }
+.esign-signed-evidence small { margin-top: 5px; color: #4e685b; }
+.esign-party-progress { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.esign-party-progress > span { display: grid; gap: 5px; padding: 17px; border: 1px solid var(--border); border-radius: 16px; background: #fbfcfa; }
+.esign-party-progress small { color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+.esign-party-progress em { color: #207044; font-size: .76rem; font-style: normal; }
+.esign-cancelled, .esign-blocked { justify-items: start; }
+.esign-cancelled p, .esign-blocked p { margin: 0; color: var(--muted); line-height: 1.6; }
+.esign-preview-layer { position: fixed; z-index: 60; inset: 0; padding: 20px; overflow: auto; background: rgba(20, 29, 25, .72); }
+.esign-preview-shell { width: min(850px, 100%); margin: 0 auto; border-radius: 20px; overflow: hidden; background: #eae7df; box-shadow: 0 22px 70px rgba(0,0,0,.32); }
+.esign-preview-toolbar { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.esign-preview-toolbar > div { display: grid; gap: 2px; }
+.esign-preview-toolbar small { color: var(--muted); }
+.esign-agreement-paper { min-height: 0; margin: 16px; }
+.esign-document-badges { display: flex; justify-content: flex-end; gap: 8px; }
+.esign-document-parties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 30px; }
+.esign-document-parties > span { display: grid; gap: 4px; padding: 12px; border: 1px solid #ddd; }
+.esign-document-parties small { color: #67716d; }
+.esign-signatures-section { margin-top: 38px; padding-top: 24px; border-top: 2px solid #343a37; }
+.esign-signatures-section > h2 { text-align: left; text-transform: uppercase; font-size: 1rem; }
+.esign-signature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.esign-signature-block { display: grid; gap: 5px; min-height: 150px; padding: 16px; border: 1px solid #d8d9d5; }
+.esign-signature-block h3, .esign-signature-block p { margin: 0; }
+.esign-signature-block > span, .esign-signature-block > small { color: #67716d; font-size: .72rem; }
+.esign-signature-block.signed > strong { color: #207044; }
+
 .btn:focus-visible, .brand:focus-visible, .workflow-card:focus-visible, .stepper-item:focus-visible, .message-prefill:focus-visible, .profile-trigger:focus-visible, .review-clause:focus-visible, .suggested-questions button:focus-visible { outline: 3px solid rgba(18, 111, 97, 0.32); outline-offset: 3px; }
 
 @media (max-width: 850px) {
@@ -635,6 +700,15 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .notary-checkpoints, .notary-completion-evidence { grid-template-columns: 1fr; }
   .notary-actions { width: 100%; }
   .notary-actions .btn { flex: 1 1 100%; }
+  .esign-heading { flex-direction: column; }
+  .esign-ready-grid, .esign-detail-list, .esign-integrity-grid, .esign-party-progress, .esign-document-parties, .esign-signature-grid { grid-template-columns: 1fr; }
+  .esign-ready-grid > span:first-child, .esign-detail-list .wide { grid-column: auto; }
+  .esign-actions { width: 100%; }
+  .esign-actions .btn { flex: 1 1 100%; }
+  .esign-loading { grid-template-columns: 1fr; }
+  .esign-preview-layer { padding: 0; }
+  .esign-preview-shell { min-height: 100%; border-radius: 0; }
+  .esign-agreement-paper { margin: 0; }
   .custom-split .btn { width: 100%; }
   .journey-preview ol { grid-template-columns: 1fr; gap: 9px; }
   .journey-preview li { grid-template-columns: auto 1fr; align-items: center; justify-items: start; text-align: left; }

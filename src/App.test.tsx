@@ -329,7 +329,7 @@ describe('persistent multi-document journey', () => {
     expect(notarized.notarizationCompletedAt).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Continue to Sign' }))
-    expect(await screen.findByRole('heading', { name: 'eSign' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ready to sign' })).toBeInTheDocument()
   })
 
   it('executes the remaining steps while keeping pre-finalization steps locked', async () => {
@@ -357,15 +357,55 @@ describe('persistent multi-document journey', () => {
     }
 
     await user.click(screen.getByRole('button', { name: 'Skip' }))
-    expect(await screen.findByRole('heading', { name: 'eSign' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ready to sign' })).toBeInTheDocument()
     const skipped = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
     expect(skipped.notarizationStatus).toBe('skipped')
     expect(skipped.notarized).toBe(false)
+
+    expect(screen.getByRole('button', { name: 'Continue to eSign' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Review Final Agreement' }))
+    const preview = await screen.findByRole('dialog', { name: 'Residential Rent Agreement' })
+    expect(within(preview).getAllByText('Awaiting signature')).toHaveLength(2)
+    await user.click(within(preview).getByRole('button', { name: 'Close final agreement' }))
+
+    await user.click(screen.getByRole('checkbox', { name: /I have reviewed and agree/ }))
+    await user.click(screen.getByRole('button', { name: 'Continue to eSign' }))
+    expect(await screen.findByRole('heading', { name: 'Secure eSign' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByRole('heading', { name: 'Signature not completed' })).toBeInTheDocument()
+    expect(loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement.tenantSignature).toBeUndefined()
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await user.click(screen.getByRole('checkbox', { name: /I have reviewed and agree/ }))
+    await user.click(screen.getByRole('button', { name: 'Continue to eSign' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm & Sign' }))
+    expect(await screen.findByRole('heading', { name: 'Signed successfully' }, { timeout: 3000 })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View signing progress' }))
+    expect(await screen.findByRole('heading', { name: 'Signing progress' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Switch to Landlord' }))
+    expect(await screen.findByText('You are about to sign the same finalized document.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: /I have reviewed and agree/ }))
+    await user.click(screen.getByRole('button', { name: 'Continue to eSign' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm & Sign' }))
+    expect(await screen.findByRole('heading', { name: 'Signed successfully' }, { timeout: 3000 })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View completion' }))
+    expect(await screen.findByRole('heading', { name: 'All signatures complete' })).toBeInTheDocument()
+    expect(await screen.findByText('Document unchanged ✓')).toBeInTheDocument()
+
+    const signed = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
+    expect(signed.tenantSignature?.signedDocumentHash).toBe(signed.finalDocumentHash)
+    expect(signed.landlordSignature?.signedDocumentHash).toBe(signed.finalDocumentHash)
+    expect(signed.tenantSignature?.signedVersion).toBe(signed.agreementVersion)
+    expect(signed.landlordSignature?.signedVersion).toBe(signed.agreementVersion)
+    expect(signed.signingEvents?.some((event) => event.type === 'signature-cancelled')).toBe(true)
+    expect(signed.signingEvents?.at(-1)?.type).toBe('all-signatures-completed')
+
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByRole('heading', { name: 'Completion' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(await screen.findByRole('heading', { name: 'eSign' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'All signatures complete' })).toBeInTheDocument()
   })
 
   it('logout preserves documents and the next login restores the active finalized view', async () => {
