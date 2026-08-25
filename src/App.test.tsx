@@ -30,9 +30,12 @@ async function finalizeDocument(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Create Agreement' }))
   await screen.findByRole('heading', { name: 'Choose what matters for your home.' })
   await user.click(screen.getByRole('button', { name: 'Continue to Review' }))
-  await screen.findByRole('heading', { name: 'Review' })
-  await user.click(screen.getByRole('button', { name: 'Finalize document' }))
-  await screen.findByRole('heading', { name: 'Finalized agreement' })
+  await screen.findByRole('heading', { name: 'Review together' })
+  await user.click(screen.getByRole('button', { name: 'Approve this version as Tenant' }))
+  await user.selectOptions(screen.getByLabelText('Viewing as'), 'landlord')
+  await user.click(screen.getByRole('button', { name: 'Approve this version as Landlord' }))
+  await user.click(screen.getByRole('button', { name: 'Finalize Agreement' }))
+  await screen.findByRole('heading', { name: 'Final agreement approved' })
 }
 
 describe('persistent multi-document journey', () => {
@@ -169,10 +172,42 @@ describe('persistent multi-document journey', () => {
     expect(screen.getAllByText(/tenancy includes car parking/i).length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('button', { name: 'Continue to Review' }))
-    expect(await screen.findByRole('heading', { name: 'Review' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Review together' })).toBeInTheDocument()
     const stored = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
     expect(stored.agreementBuilder?.deposit.refundDays).toBe(7)
     expect(stored.clauses.find((clause) => clause.id === 'security-deposit-refund')?.text).toContain('within 7 days')
+  })
+
+  it('negotiates the deposit refund, applies Version 2, and requires both approvals', async () => {
+    render(<App />)
+    const user = await login()
+    await completeDemoIntake(user)
+    await user.click(screen.getByRole('button', { name: 'Create Agreement' }))
+    await screen.findByRole('heading', { name: 'Choose what matters for your home.' })
+    await user.click(screen.getByRole('button', { name: 'Continue to Review' }))
+    await screen.findByRole('heading', { name: 'Review together' })
+
+    await user.click(screen.getByRole('button', { name: /Security Deposit.*within 30 days/i }))
+    await user.click(screen.getByRole('button', { name: 'Can we make this 7 days instead?' }))
+    await user.click(screen.getByRole('button', { name: 'Ask Saral Setu' }))
+    expect(screen.getByText('30 days → 7 days')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Propose Change' }))
+    expect(screen.getByText('Waiting for Arjun Rao')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Approve this version as Tenant' })).toBeDisabled()
+
+    await user.selectOptions(screen.getByLabelText('Viewing as'), 'landlord')
+    await user.click(screen.getByRole('button', { name: 'Accept' }))
+    expect(screen.getAllByText('Version 2').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /Security Deposit.*within 7 days/i })).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Viewing as'), 'tenant')
+    await user.click(screen.getByRole('button', { name: 'Approve this version as Tenant' }))
+    expect(screen.getByRole('button', { name: 'Finalize Agreement' })).toBeDisabled()
+    await user.selectOptions(screen.getByLabelText('Viewing as'), 'landlord')
+    await user.click(screen.getByRole('button', { name: 'Approve this version as Landlord' }))
+    await user.click(screen.getByRole('button', { name: 'Finalize Agreement' }))
+    expect(await screen.findByRole('heading', { name: 'Final agreement approved' })).toBeInTheDocument()
+    expect(screen.getByText('Both parties agreed to Version 2. The document is now locked for execution and remains read-only.')).toBeInTheDocument()
   })
 
   it('hides Share until finalization, then exports stored state without changing the current URL', async () => {
@@ -270,7 +305,7 @@ describe('persistent multi-document journey', () => {
     expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toBe(storedBeforeLogout)
     expect(await screen.findByRole('dialog', { name: 'Simulated Aadhaar OTP' })).toBeInTheDocument()
 
-    await login(TEST_AADHAAR, 'Finalized agreement')
+    await login(TEST_AADHAAR, 'Final agreement approved')
     expect(screen.getByText('You’re the tenant')).toBeInTheDocument()
   })
 })

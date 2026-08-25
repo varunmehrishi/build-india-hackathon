@@ -13,15 +13,16 @@ function roleLabel(role: PartyRole | undefined): string {
 
 export function FinalizedView({ agreement, localRole }: FinalizedViewProps) {
   const finalizedBy = agreement.finalizedBy ?? agreement.lastUpdatedBy ?? agreement.initiator
+  const finalVersion = agreement.review?.finalizedVersion ?? agreement.agreementVersion
   return (
     <div className="finalized-content">
       <Card className="finalized-card">
         <div className="finalized-heading">
           <div>
             <p className="eyebrow">Locked document</p>
-            <h1>Finalized agreement</h1>
+            <h1>Final agreement approved</h1>
             <p className="lede">
-              Finalized by the {roleLabel(finalizedBy).toLocaleLowerCase('en-IN')}. This point-in-time document is read-only.
+              Both parties agreed to Version {finalVersion}. The document is now locked for execution and remains read-only.
             </p>
           </div>
           <Badge tone="success">Finalized</Badge>
@@ -29,7 +30,9 @@ export function FinalizedView({ agreement, localRole }: FinalizedViewProps) {
 
         <div className="document-meta">
           <span><small>Your role</small><strong>{localRole ? roleLabel(localRole) : 'Not assigned'}</strong></span>
-          <span><small>Version</small><strong>{agreement.agreementVersion}</strong></span>
+          <span><small>Final version</small><strong>Version {finalVersion}</strong></span>
+          <span><small>Document ID</small><strong>{agreement.agreementId}</strong></span>
+          <span><small>Finalized by</small><strong>{roleLabel(finalizedBy)}</strong></span>
         </div>
 
         <section className="finalized-section">
@@ -61,6 +64,21 @@ export function FinalizedView({ agreement, localRole }: FinalizedViewProps) {
             ))}
           </div>
         </section>
+
+        {agreement.agreementBuilder?.furnishing.level !== 'unfurnished' && agreement.agreementBuilder?.furnishing.inventory.length ? (
+          <section className="finalized-section">
+            <p className="eyebrow">Schedule A</p>
+            <h2>Furnishings, fixtures and inventory</h2>
+            <div className="clause-list">
+              {agreement.agreementBuilder.furnishing.inventory.map((item) => (
+                <article key={item.id}>
+                  <strong>{item.quantity} × {item.name}</strong>
+                  <p>{item.condition}{item.notes ? ` · ${item.notes}` : ''}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </Card>
     </div>
   )

@@ -1,6 +1,6 @@
 import { Unzlib, zlibSync } from 'fflate'
 import { isAgreementBuilderConfiguration } from './agreementBuilder'
-import type { AgreementState, PartyRole, StampDutyContribution, WorkflowStep } from './types'
+import type { AgreementReviewState, AgreementState, PartyRole, StampDutyContribution, WorkflowStep } from './types'
 
 export const SNAPSHOT_FRAGMENT_KEY = 'share'
 export const MAX_ENCODED_SNAPSHOT_LENGTH = 64 * 1024
@@ -84,6 +84,44 @@ function isClause(value: unknown): boolean {
   return typeof clause.id === 'string' && typeof clause.title === 'string' && typeof clause.text === 'string'
 }
 
+function isReviewState(value: unknown): value is AgreementReviewState {
+  if (!value || typeof value !== 'object') return false
+  const review = value as Record<string, unknown>
+  const proposals = review.proposals
+  const events = review.events
+  return (
+    isPartyRole(review.currentRole) &&
+    (review.selectedClauseId === undefined || typeof review.selectedClauseId === 'string') &&
+    Array.isArray(proposals) && proposals.every((value) => {
+      if (!value || typeof value !== 'object') return false
+      const proposal = value as Record<string, unknown>
+      const structuredChange = proposal.structuredChange
+      return typeof proposal.id === 'string' && typeof proposal.clauseId === 'string' &&
+        isPartyRole(proposal.proposedBy) && typeof proposal.oldText === 'string' &&
+        typeof proposal.newText === 'string' && typeof proposal.summary === 'string' &&
+        typeof proposal.reason === 'string' && ['pending', 'accepted', 'rejected'].includes(String(proposal.status)) &&
+        typeof proposal.createdAt === 'string' &&
+        (proposal.resolvedAt === undefined || typeof proposal.resolvedAt === 'string') &&
+        (proposal.resolvedBy === undefined || isPartyRole(proposal.resolvedBy)) &&
+        (structuredChange === undefined || (
+          !!structuredChange && typeof structuredChange === 'object' &&
+          (structuredChange as Record<string, unknown>).field === 'deposit.refundDays' &&
+          typeof (structuredChange as Record<string, unknown>).value === 'number'
+        ))
+    }) &&
+    Array.isArray(events) && events.every((value) => {
+      if (!value || typeof value !== 'object') return false
+      const event = value as Record<string, unknown>
+      return typeof event.id === 'string' && typeof event.type === 'string' &&
+        ['proposal-created', 'proposal-accepted', 'proposal-rejected', 'agreement-updated', 'party-approved', 'agreement-finalized'].includes(event.type) &&
+        (event.actor === undefined || isPartyRole(event.actor)) && typeof event.timestamp === 'string' && typeof event.message === 'string'
+    }) &&
+    (review.landlordApprovedVersion === undefined || typeof review.landlordApprovedVersion === 'number') &&
+    (review.tenantApprovedVersion === undefined || typeof review.tenantApprovedVersion === 'number') &&
+    (review.finalizedVersion === undefined || typeof review.finalizedVersion === 'number')
+  )
+}
+
 function isStampContribution(value: unknown): value is StampDutyContribution {
   if (!value || typeof value !== 'object') return false
   const item = value as Partial<StampDutyContribution>
@@ -150,6 +188,7 @@ export function isAgreementState(value: unknown): value is AgreementState {
     Array.isArray(state.clauses) &&
     state.clauses.every(isClause) &&
     (state.agreementBuilder === undefined || isAgreementBuilderConfiguration(state.agreementBuilder)) &&
+    (state.review === undefined || isReviewState(state.review)) &&
     !!state.requirements &&
     typeof state.requirements.stampDutyAmount === 'number' &&
     typeof state.requirements.registrationRequired === 'boolean' &&

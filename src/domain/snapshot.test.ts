@@ -3,6 +3,7 @@ import { zlibSync } from 'fflate'
 import { createInitialAgreementState } from './demoData'
 import { createDefaultAgreementBuilderConfiguration } from './agreementBuilder'
 import { applyIntakeDraft, demoIntakeDraft } from './intake'
+import { createProposal, resolveReviewState } from './review'
 import { configureStampDutyPayment, recordStampDutyPayment } from './stampDuty'
 import {
   MAX_ENCODED_SNAPSHOT_LENGTH,
@@ -32,6 +33,22 @@ describe('workflow snapshots', () => {
     }
     original.agreement.agreementBuilder = createDefaultAgreementBuilderConfiguration()
     original.agreement.agreementBuilder.deposit.refundDays = 7
+    original.agreement.clauses = [{
+      id: 'security-deposit-refund',
+      title: 'Security Deposit',
+      text: 'The security deposit will be refunded within 30 days after handover.',
+    }]
+    original.agreement.review = {
+      ...resolveReviewState(original.agreement),
+      currentRole: 'tenant',
+      selectedClauseId: 'security-deposit-refund',
+    }
+    original.agreement = createProposal(
+      original.agreement,
+      'security-deposit-refund',
+      'Can we make this 7 days instead?',
+      '2026-08-25T10:00:00.000Z',
+    )
     const result = decodeSnapshot(encodeSnapshot(original))
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.snapshot).toEqual(original)

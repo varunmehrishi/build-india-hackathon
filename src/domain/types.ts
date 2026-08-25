@@ -60,6 +60,52 @@ export interface Clause {
   status?: 'unchanged' | 'proposed' | 'accepted' | 'rejected'
 }
 
+export type ProposalStatus = 'pending' | 'accepted' | 'rejected'
+
+export interface ProposedChange {
+  id: string
+  clauseId: string
+  proposedBy: PartyRole
+  oldText: string
+  newText: string
+  summary: string
+  reason: string
+  status: ProposalStatus
+  createdAt: string
+  resolvedAt?: string
+  resolvedBy?: PartyRole
+  structuredChange?: {
+    field: 'deposit.refundDays'
+    value: number
+  }
+}
+
+export type ReviewEventType =
+  | 'proposal-created'
+  | 'proposal-accepted'
+  | 'proposal-rejected'
+  | 'agreement-updated'
+  | 'party-approved'
+  | 'agreement-finalized'
+
+export interface ReviewEvent {
+  id: string
+  type: ReviewEventType
+  actor?: PartyRole
+  timestamp: string
+  message: string
+}
+
+export interface AgreementReviewState {
+  currentRole: PartyRole
+  selectedClauseId?: string
+  proposals: ProposedChange[]
+  landlordApprovedVersion?: number
+  tenantApprovedVersion?: number
+  finalizedVersion?: number
+  events: ReviewEvent[]
+}
+
 export type ClauseImportance = 'essential' | 'recommended' | 'optional'
 export type FurnishingLevel = 'unfurnished' | 'semi-furnished' | 'fully-furnished'
 export type ResponsibleParty = 'landlord' | 'tenant' | 'included'
@@ -177,6 +223,7 @@ export interface AgreementState {
   tenant: Party
   clauses: Clause[]
   agreementBuilder?: AgreementBuilderConfiguration
+  review?: AgreementReviewState
   requirements: {
     stampDutyAmount: number
     registrationRequired: boolean

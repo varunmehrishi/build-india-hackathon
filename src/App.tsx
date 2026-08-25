@@ -15,9 +15,10 @@ import {
 import { workflowStepOrder, workflowSteps } from './domain/demoData'
 import { generateAgreement, resolveAgreementBuilderConfiguration } from './domain/agreementBuilder'
 import { applyIntakeDraft, suggestDocumentName } from './domain/intake'
+import { finalizeReviewedAgreement, resolveReviewState } from './domain/review'
 import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
 import { configureStampDutyPayment, isStampDutyComplete, recordStampDutyPayment } from './domain/stampDuty'
-import type { AgreementBuilderConfiguration, IntakeDraft, WorkflowStep } from './domain/types'
+import type { AgreementBuilderConfiguration, AgreementState, IntakeDraft, WorkflowStep } from './domain/types'
 import {
   activeDocument,
   addNewDocument,
@@ -37,6 +38,7 @@ import { FinalizedView } from './features/finalized/FinalizedView'
 import { DetailsScreen } from './features/intake/DetailsScreen'
 import { IntentScreen } from './features/intake/IntentScreen'
 import { RequirementsScreen } from './features/requirements/RequirementsScreen'
+import { AgreementReview } from './features/review/AgreementReview'
 import { ShareDialog } from './features/sharing/ShareDialog'
 import { StampDutyScreen } from './features/stamp/StampDutyScreen'
 
@@ -331,21 +333,35 @@ function App() {
   }
 
   function updateAgreementBuilder(configuration: AgreementBuilderConfiguration) {
-    mutateActiveDocument((current) => ({
-      ...current,
-      agreement: {
-        ...current.agreement,
-        agreementBuilder: configuration,
-        clauses: generateAgreement(current.agreement, configuration).clauses,
-        snapshotRevision: current.agreement.snapshotRevision + 1,
-        lastUpdatedBy: activeRole,
-      },
-    }))
+    mutateActiveDocument((current) => {
+      const returningFromReview = Boolean(current.agreement.review)
+      return {
+        ...current,
+        agreement: {
+          ...current.agreement,
+          agreementBuilder: configuration,
+          clauses: generateAgreement(current.agreement, configuration).clauses,
+          review: returningFromReview ? undefined : current.agreement.review,
+          agreementVersion: returningFromReview
+            ? current.agreement.agreementVersion + 1
+            : current.agreement.agreementVersion,
+          landlord: returningFromReview
+            ? { ...current.agreement.landlord, approvedAgreement: false }
+            : current.agreement.landlord,
+          tenant: returningFromReview
+            ? { ...current.agreement.tenant, approvedAgreement: false }
+            : current.agreement.tenant,
+          snapshotRevision: current.agreement.snapshotRevision + 1,
+          lastUpdatedBy: activeRole,
+        },
+      }
+    })
   }
 
   function continueFromAgreement() {
     mutateActiveDocument((current) => {
       const configuration = resolveAgreementBuilderConfiguration(current.agreement)
+      const clauses = generateAgreement(current.agreement, configuration).clauses
       const reviewIndex = workflowStepOrder.indexOf('review')
       return {
         ...current,
@@ -353,7 +369,8 @@ function App() {
         agreement: {
           ...current.agreement,
           agreementBuilder: configuration,
-          clauses: generateAgreement(current.agreement, configuration).clauses,
+          clauses,
+          review: current.agreement.review ?? resolveReviewState({ ...current.agreement, clauses }),
           workflowStep: 'review',
           snapshotRevision: current.agreement.snapshotRevision + 1,
           lastUpdatedBy: activeRole,
@@ -362,23 +379,32 @@ function App() {
     })
   }
 
-  function finalizeDocument() {
-    if (!activeRole || !state.intakeCompleted || state.finalized) return
+  function updateAgreementReview(nextAgreement: AgreementState) {
     mutateActiveDocument((current) => ({
       ...current,
-      furthestStepIndex: Math.max(current.furthestStepIndex, finalizedStepIndex),
       agreement: {
-        ...current.agreement,
-        workflowStep: 'finalized',
-        finalized: true,
-        finalizedBy: activeRole,
-        finalizedAt: new Date().toISOString(),
-        [activeRole]: { ...current.agreement[activeRole], approvedAgreement: true },
+        ...nextAgreement,
         snapshotRevision: current.agreement.snapshotRevision + 1,
-        lastUpdatedBy: activeRole,
+        lastUpdatedBy: nextAgreement.review?.currentRole ?? activeRole,
       },
     }))
-    setNotice(`Document finalized by the ${activeRole}.`)
+  }
+
+  function finalizeDocument() {
+    mutateActiveDocument((current) => {
+      const finalized = finalizeReviewedAgreement(current.agreement)
+      if (!finalized.finalized) return current
+      return {
+        ...current,
+        furthestStepIndex: Math.max(current.furthestStepIndex, finalizedStepIndex),
+        agreement: {
+          ...finalized,
+          snapshotRevision: current.agreement.snapshotRevision + 1,
+          lastUpdatedBy: finalized.review?.currentRole ?? activeRole,
+        },
+      }
+    })
+    setNotice('Both parties approved the final agreement. It is locked for execution.')
   }
 
   function configureStampDuty(landlordPercentage: number) {
@@ -502,6 +528,8 @@ function App() {
                 <RequirementsScreen agreement={state} />
               ) : state.workflowStep === 'agreement' ? (
                 <AgreementBuilder agreement={state} onChange={updateAgreementBuilder} />
+              ) : state.workflowStep === 'review' ? (
+                <AgreementReview agreement={state} onChange={updateAgreementReview} onFinalize={finalizeDocument} />
               ) : (
                 <Card className="stage-card">
                   <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>
@@ -518,9 +546,7 @@ function App() {
               )}
               <div className="journey-actions">
                 <Button variant="ghost" onClick={() => moveStep(-1)} disabled={state.workflowStep === 'finalized'}>Back</Button>
-                {state.workflowStep === 'review' ? (
-                  <Button onClick={finalizeDocument}>Finalize document</Button>
-                ) : state.workflowStep === 'agreement' ? (
+                {state.workflowStep === 'review' ? null : state.workflowStep === 'agreement' ? (
                   <Button onClick={continueFromAgreement}>Continue to Review</Button>
                 ) : (
                   <Button
