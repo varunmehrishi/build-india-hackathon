@@ -24,6 +24,7 @@ export function NotarizationScreen({ agreement, onSkip, onAttest, onContinue }: 
   const status = resolveNotarizationStatus(agreement)
   const [view, setView] = useState<SessionView>('decision')
   const bothVerified = areBothPartiesVerified(agreement)
+  const optional = agreement.requirements.notarizationOptional
 
   if (status === 'completed') {
     return (
@@ -66,13 +67,13 @@ export function NotarizationScreen({ agreement, onSkip, onAttest, onContinue }: 
         <div className="section-heading">
           <p className="eyebrow">Execution checkpoint</p>
           <h1>Notarisation</h1>
-          <h2>Optional for this agreement</h2>
+          <h2>{optional ? 'Optional for this agreement' : 'Required for this agreement'}</h2>
           <p className="stage-description">A notary can independently attest the identity of the parties and execution of the agreement.</p>
         </div>
-        <p className="notary-demo-note">This is an optional, simulated checkpoint for this demo agreement.</p>
+        <p className="notary-demo-note">This is a simulated checkpoint scoped to this demo agreement.</p>
         <div className="notary-actions">
           <Button onClick={() => setView('notary')}>Add Notarisation</Button>
-          <Button variant="ghost" onClick={onSkip}>Skip</Button>
+          {optional ? <Button variant="ghost" onClick={onSkip}>Skip</Button> : null}
         </div>
       </Card>
     )

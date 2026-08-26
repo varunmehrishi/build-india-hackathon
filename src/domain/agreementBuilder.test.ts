@@ -46,7 +46,7 @@ describe('agreement builder generation', () => {
     const generated = generateAgreement(demoAgreement(), configuration)
     expect(generated.clauses.find((clause) => clause.id === 'security-deposit-refund')?.text).toContain('7 days')
     expect(generated.clauses.some((clause) => clause.id === 'subletting')).toBe(false)
-    expect(generated.clauses.find((clause) => clause.id === 'premises')?.text).toContain('B-42')
+    expect(generated.clauses.find((clause) => clause.id === 'premises')?.text).not.toContain('B-42')
     expect(generated.clauses.find((clause) => clause.id === 'parking')?.text).toContain('B-42')
     expect(generated.clauses.find((clause) => clause.id === 'pets')?.text).toContain('No disturbance')
   })

@@ -13,11 +13,13 @@ interface CanonicalFinalAgreement {
   agreementId: string
   version: number
   parties: { landlord: string; tenant: string }
-  property: AgreementState['property']
-  financialTerms: { monthlyRent: number; securityDeposit: number }
-  term: { durationMonths: number; startDate: string }
-  clauses: Array<{ id: string; title: string; text: string }>
-  agreementBuilder: AgreementState['agreementBuilder'] | null
+  clauses: Array<{ title: string; text: string }>
+  inventory: Array<{
+    name: string
+    quantity: number
+    condition: string
+    notes: string
+  }>
 }
 
 function signatureField(role: PartyRole): 'landlordSignature' | 'tenantSignature' {
@@ -38,6 +40,11 @@ export function finalAgreementVersion(agreement: AgreementState): number {
   return agreement.review?.finalizedVersion ?? agreement.agreementVersion
 }
 
+export function finalAgreementInventory(agreement: AgreementState) {
+  const furnishing = agreement.agreementBuilder?.furnishing
+  return furnishing && furnishing.level !== 'unfurnished' ? furnishing.inventory : []
+}
+
 export function serializeFinalAgreement(agreement: AgreementState): string {
   const canonical: CanonicalFinalAgreement = {
     schema: 'saral-setu-final-agreement-v1',
@@ -47,17 +54,13 @@ export function serializeFinalAgreement(agreement: AgreementState): string {
       landlord: agreement.landlord.name,
       tenant: agreement.tenant.name,
     },
-    property: agreement.property,
-    financialTerms: {
-      monthlyRent: agreement.monthlyRent,
-      securityDeposit: agreement.securityDeposit,
-    },
-    term: {
-      durationMonths: agreement.durationMonths,
-      startDate: agreement.startDate,
-    },
-    clauses: agreement.clauses.map(({ id, title, text }) => ({ id, title, text })),
-    agreementBuilder: agreement.agreementBuilder ?? null,
+    clauses: agreement.clauses.map(({ title, text }) => ({ title, text })),
+    inventory: finalAgreementInventory(agreement).map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      condition: item.condition,
+      notes: item.notes,
+    })),
   }
   return JSON.stringify(canonical)
 }

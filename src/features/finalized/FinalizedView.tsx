@@ -1,6 +1,7 @@
 import { Badge } from '../../components/ui/Badge'
 import { Card } from '../../components/ui/Card'
 import type { AgreementState, PartyRole } from '../../domain/types'
+import { finalAgreementInventory } from '../../domain/signing'
 
 interface FinalizedViewProps {
   agreement: AgreementState
@@ -14,6 +15,7 @@ function roleLabel(role: PartyRole | undefined): string {
 export function FinalizedView({ agreement, localRole }: FinalizedViewProps) {
   const finalizedBy = agreement.finalizedBy ?? agreement.lastUpdatedBy ?? agreement.initiator
   const finalVersion = agreement.review?.finalizedVersion ?? agreement.agreementVersion
+  const inventory = finalAgreementInventory(agreement)
   return (
     <div className="finalized-content">
       <Card className="finalized-card">
@@ -65,12 +67,12 @@ export function FinalizedView({ agreement, localRole }: FinalizedViewProps) {
           </div>
         </section>
 
-        {agreement.agreementBuilder?.furnishing.level !== 'unfurnished' && agreement.agreementBuilder?.furnishing.inventory.length ? (
+        {inventory.length ? (
           <section className="finalized-section">
             <p className="eyebrow">Schedule A</p>
             <h2>Furnishings, fixtures and inventory</h2>
             <div className="clause-list">
-              {agreement.agreementBuilder.furnishing.inventory.map((item) => (
+              {inventory.map((item) => (
                 <article key={item.id}>
                   <strong>{item.quantity} × {item.name}</strong>
                   <p>{item.condition}{item.notes ? ` · ${item.notes}` : ''}</p>

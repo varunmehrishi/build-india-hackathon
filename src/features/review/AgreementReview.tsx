@@ -17,8 +17,10 @@ import type { AgreementState, PartyRole, ProposedChange } from '../../domain/typ
 
 interface AgreementReviewProps {
   agreement: AgreementState
+  viewingRole: PartyRole
   onChange: (agreement: AgreementState) => void
   onFinalize: () => void
+  onOpenOtherParty?: () => void
 }
 
 function roleLabel(role: PartyRole): string {
@@ -43,8 +45,9 @@ function ProposalDiff({ proposal }: { proposal: ProposedChange }) {
   )
 }
 
-export function AgreementReview({ agreement, onChange, onFinalize }: AgreementReviewProps) {
-  const review = resolveReviewState(agreement)
+export function AgreementReview({ agreement, viewingRole, onChange, onFinalize, onOpenOtherParty }: AgreementReviewProps) {
+  const review = { ...resolveReviewState(agreement), currentRole: viewingRole }
+  const viewingAgreement = { ...agreement, review }
   const selectedClause = agreement.clauses.find((clause) => clause.id === review.selectedClauseId) ?? agreement.clauses[0]
   const [question, setQuestion] = useState('')
   const [askedQuestion, setAskedQuestion] = useState('')
@@ -57,7 +60,7 @@ export function AgreementReview({ agreement, onChange, onFinalize }: AgreementRe
   const pending = review.proposals.filter((proposal) => proposal.status === 'pending')
   const resolved = review.proposals.length - pending.length
   const ready = canFinalizeAgreement(agreement)
-  const currentRole = review.currentRole
+  const currentRole = viewingRole
   const currentApproval = currentRole === 'landlord' ? review.landlordApprovedVersion : review.tenantApprovedVersion
 
   function updateReview(values: Partial<typeof review>) {
@@ -78,7 +81,7 @@ export function AgreementReview({ agreement, onChange, onFinalize }: AgreementRe
 
   function proposeChange() {
     if (!selectedClause || !askedQuestion || !proposalPreview) return
-    onChange(createProposal(agreement, selectedClause.id, askedQuestion))
+    onChange(createProposal(viewingAgreement, selectedClause.id, askedQuestion))
     setQuestion('')
     setAskedQuestion('')
   }
@@ -92,15 +95,9 @@ export function AgreementReview({ agreement, onChange, onFinalize }: AgreementRe
           <p className="lede">Read each clause, ask a plain-language question, and agree on one final version before execution.</p>
         </div>
         <div className="review-role-control">
-          <label htmlFor="review-role">Viewing as</label>
-          <select
-            id="review-role"
-            value={currentRole}
-            onChange={(event) => updateReview({ currentRole: event.target.value as PartyRole })}
-          >
-            <option value="tenant">{agreement.tenant.name} — Tenant</option>
-            <option value="landlord">{agreement.landlord.name} — Landlord</option>
-          </select>
+          <small>Viewing as</small>
+          <strong>{agreement[currentRole].name} — {roleLabel(currentRole)}</strong>
+          {onOpenOtherParty ? <Button variant="ghost" onClick={onOpenOtherParty}>View as {roleLabel(otherRole(currentRole))}</Button> : null}
         </div>
       </header>
 
@@ -197,7 +194,7 @@ export function AgreementReview({ agreement, onChange, onFinalize }: AgreementRe
                       <p>“{proposal.reason}”</p>
                       <small>Proposed by {agreement[proposal.proposedBy].name}</small>
                       <ProposalDiff proposal={proposal} />
-                      {canRespond ? <div className="proposal-actions"><Button onClick={() => onChange(resolveProposal(agreement, proposal.id, 'accepted'))}>Accept</Button><Button variant="ghost" onClick={() => onChange(resolveProposal(agreement, proposal.id, 'rejected'))}>Reject</Button></div> : null}
+                      {canRespond ? <div className="proposal-actions"><Button onClick={() => onChange(resolveProposal(viewingAgreement, proposal.id, 'accepted'))}>Accept</Button><Button variant="ghost" onClick={() => onChange(resolveProposal(viewingAgreement, proposal.id, 'rejected'))}>Reject</Button></div> : null}
                       {proposal.status === 'pending' && !canRespond ? <p className="waiting-copy">Waiting for {agreement[otherRole(proposal.proposedBy)].name}</p> : null}
                     </article>
                   )
@@ -221,7 +218,7 @@ export function AgreementReview({ agreement, onChange, onFinalize }: AgreementRe
           </div>
           {currentApproval === agreement.agreementVersion
             ? <p className="approval-confirmation">✓ {agreement[currentRole].name} approved Version {agreement.agreementVersion}</p>
-            : <Button onClick={() => onChange(approveCurrentVersion(agreement))} disabled={Boolean(pending.length)}>Approve this version as {roleLabel(currentRole)}</Button>}
+            : <Button onClick={() => onChange(approveCurrentVersion(viewingAgreement))} disabled={Boolean(pending.length)}>Approve this version as {roleLabel(currentRole)}</Button>}
           {(review.landlordApprovedVersion || review.tenantApprovedVersion) && !ready && !pending.length ? <p className="muted">Both parties need to approve this exact version.</p> : null}
         </Card>
 

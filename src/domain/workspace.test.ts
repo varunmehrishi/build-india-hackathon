@@ -57,6 +57,23 @@ describe('local workspace repository', () => {
     expect(result.documents[imported.agreementId].intakeDraft.documentName).toBe('Arjun Rao & Meera Sharma')
   })
 
+  it('deterministically rejects an older revision of the same agreement', () => {
+    const workspace = createWorkspace()
+    const id = workspace.activeDocumentId
+    workspace.documents[id].agreement.snapshotRevision = 8
+    workspace.documents[id].agreement.intentText = 'Keep the newer local state'
+    const older = { ...workspace.documents[id].agreement, snapshotRevision: 7, intentText: 'Older shared state' }
+
+    const result = importSnapshot(workspace, {
+      codecVersion: 1,
+      agreement: older,
+      furthestStepIndex: workspace.documents[id].furthestStepIndex,
+    })
+
+    expect(result).toBe(workspace)
+    expect(result.documents[id].agreement.intentText).toBe('Keep the newer local state')
+  })
+
   it('migrates version-one documents with a party-based name', () => {
     const current = createWorkspace()
     const currentDocument = current.documents[current.activeDocumentId]

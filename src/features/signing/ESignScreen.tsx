@@ -18,10 +18,10 @@ interface ESignScreenProps {
   agreement: AgreementState
   signingRole: PartyRole
   onPrepare: () => Promise<void>
-  onRoleChange: (role: PartyRole) => void
   onSign: (role: PartyRole) => Promise<boolean>
   onCancel: (role: PartyRole) => void
   onContinue: () => void
+  onOpenOtherParty?: () => void
 }
 
 type View = 'ready' | 'ceremony' | 'cancelled' | 'success' | 'progress'
@@ -47,7 +47,7 @@ function formatDateTime(timestamp: string): string {
   }).format(new Date(timestamp))
 }
 
-export function ESignScreen({ agreement, signingRole, onPrepare, onRoleChange, onSign, onCancel, onContinue }: ESignScreenProps) {
+export function ESignScreen({ agreement, signingRole, onPrepare, onSign, onCancel, onContinue, onOpenOtherParty }: ESignScreenProps) {
   const signature = agreement[signingRole === 'landlord' ? 'landlordSignature' : 'tenantSignature']
   const [consented, setConsented] = useState(false)
   const [view, setView] = useState<View>(signature ? 'progress' : 'ready')
@@ -101,12 +101,6 @@ export function ESignScreen({ agreement, signingRole, onPrepare, onRoleChange, o
     onCancel(signingRole)
   }
 
-  function switchRole(role: PartyRole) {
-    onRoleChange(role)
-    setView('ready')
-    setConsented(false)
-  }
-
   if (!canEnterSigning(agreement)) {
     return <Card className="esign-card"><p className="eyebrow">eSign unavailable</p><h1>Complete the execution checks first</h1><p className="stage-description">Finalization, stamp duty, both identity checks, and the optional notarisation decision must be complete before signing.</p></Card>
   }
@@ -158,7 +152,7 @@ export function ESignScreen({ agreement, signingRole, onPrepare, onRoleChange, o
           })}
         </div>
         <DocumentIntegrity agreement={agreement} />
-        {!complete ? <Button onClick={() => switchRole(counterpart)}>Switch to {roleLabel(counterpart)}</Button> : <Button onClick={() => setView('ready')}>View completion</Button>}
+        {!complete ? (onOpenOtherParty ? <Button onClick={onOpenOtherParty}>View as {roleLabel(counterpart)}</Button> : <p className="muted">Send this party’s completed action to the shared agreement, then continue in the original demo.</p>) : <Button onClick={() => setView('ready')}>View completion</Button>}
       </Card>
     )
   }

@@ -3,7 +3,7 @@ import { zlibSync } from 'fflate'
 import { createInitialAgreementState } from './demoData'
 import { createDefaultAgreementBuilderConfiguration } from './agreementBuilder'
 import { applyIntakeDraft, demoIntakeDraft } from './intake'
-import { createProposal, resolveReviewState } from './review'
+import { resolveReviewState } from './review'
 import { configureStampDutyPayment, recordStampDutyPayment } from './stampDuty'
 import {
   MAX_ENCODED_SNAPSHOT_LENGTH,
@@ -34,9 +34,27 @@ describe('workflow snapshots', () => {
     original.agreement.agreementBuilder = createDefaultAgreementBuilderConfiguration()
     original.agreement.agreementBuilder.deposit.refundDays = 7
     original.agreement.identityVerificationRole = 'landlord'
+    original.agreement.finalized = true
+    original.agreement.finalizedBy = 'tenant'
+    original.agreement.finalizedAt = '2026-08-26T09:00:00.000Z'
+    original.agreement.workflowStep = 'sign'
+    original.furthestStepIndex = 9
+    original.agreement.stampDutyPayment = configureStampDutyPayment(original.agreement, 50, 'tenant')
+    original.agreement.stampDutyPayment = recordStampDutyPayment(original.agreement, 'tenant', '2026-08-26T09:10:00.000Z', 'SS-STAMP-TENANT')
+    original.agreement.stampDutyPayment = recordStampDutyPayment({ ...original.agreement, stampDutyPayment: original.agreement.stampDutyPayment }, 'landlord', '2026-08-26T09:11:00.000Z', 'SS-STAMP-LANDLORD')
+    original.agreement.stampCompleted = true
     original.agreement.landlord.identityVerified = true
     original.agreement.landlord.identityVerifiedVersion = original.agreement.agreementVersion
     original.agreement.landlord.identityVerifiedAt = '2026-08-26T10:00:00.000Z'
+    original.agreement.landlord.participantId = 'participant-landlord'
+    original.agreement.landlord.identityVerifiedParticipantId = 'participant-landlord'
+    original.agreement.landlord.identityVerifiedAadhaarLast4 = '6666'
+    original.agreement.tenant.identityVerified = true
+    original.agreement.tenant.identityVerifiedVersion = original.agreement.agreementVersion
+    original.agreement.tenant.identityVerifiedAt = '2026-08-26T10:01:00.000Z'
+    original.agreement.tenant.participantId = 'participant-tenant'
+    original.agreement.tenant.identityVerifiedParticipantId = 'participant-tenant'
+    original.agreement.tenant.identityVerifiedAadhaarLast4 = '3333'
     original.agreement.notarizationStatus = 'completed'
     original.agreement.notarized = true
     original.agreement.notaryDisplayName = 'Adv. A. Sharma'
@@ -55,6 +73,7 @@ describe('workflow snapshots', () => {
       signedAt: '2026-08-26T14:48:00.000Z',
       signatureReference: 'SIG-DEMO-A73F',
     }
+    original.agreement.tenant.signed = true
     original.agreement.signingEvents = [{
       id: 'signature-completed-1',
       type: 'signature-completed',
@@ -71,13 +90,12 @@ describe('workflow snapshots', () => {
       ...resolveReviewState(original.agreement),
       currentRole: 'tenant',
       selectedClauseId: 'security-deposit-refund',
+      finalizedVersion: original.agreement.agreementVersion,
+      landlordApprovedVersion: original.agreement.agreementVersion,
+      tenantApprovedVersion: original.agreement.agreementVersion,
     }
-    original.agreement = createProposal(
-      original.agreement,
-      'security-deposit-refund',
-      'Can we make this 7 days instead?',
-      '2026-08-25T10:00:00.000Z',
-    )
+    original.agreement.landlord.approvedAgreement = true
+    original.agreement.tenant.approvedAgreement = true
     const result = decodeSnapshot(encodeSnapshot(original))
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.snapshot).toEqual(original)
@@ -119,6 +137,17 @@ describe('workflow snapshots', () => {
     const encoded = encodeSnapshot(createSnapshot())
     const result = decodeSnapshot(encoded.slice(0, Math.floor(encoded.length / 2)))
     expect(result.ok).toBe(false)
+  })
+
+  it('rejects structurally valid snapshots with impossible workflow state', () => {
+    const impossible = createSnapshot('tenant')
+    impossible.agreement.workflowStep = 'complete'
+    impossible.furthestStepIndex = 10
+    expect(decodeSnapshot(encodeSnapshot(impossible)).ok).toBe(false)
+
+    const falsePayment = createSnapshot('tenant')
+    falsePayment.agreement.stampCompleted = true
+    expect(decodeSnapshot(encodeSnapshot(falsePayment)).ok).toBe(false)
   })
 
   it('stops highly compressed input at the decoded-size limit', () => {

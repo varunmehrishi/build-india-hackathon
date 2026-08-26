@@ -13,6 +13,7 @@ import {
 export interface AadhaarVerificationResult {
   participantId: string
   encryptedAadhaar: EncryptedAadhaarRecord
+  aadhaarLast4: string
   demoDisplayName?: string
 }
 
@@ -26,6 +27,7 @@ interface AadhaarOtpDialogProps {
   onCancel?: () => void
   layerClassName?: string
   idPrefix?: string
+  fixedIdentity?: typeof DEMO_IDENTITIES[number]
 }
 
 function formatAadhaar(value: string): string {
@@ -42,8 +44,9 @@ export function AadhaarOtpDialog({
   onCancel,
   layerClassName = 'auth-layer',
   idPrefix = 'demo',
+  fixedIdentity,
 }: AadhaarOtpDialogProps) {
-  const [identifier, setIdentifier] = useState('')
+  const [identifier, setIdentifier] = useState(fixedIdentity ? formatAadhaar(fixedIdentity.aadhaar) : '')
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
   const [error, setError] = useState('')
@@ -101,6 +104,7 @@ export function AadhaarOtpDialog({
       onVerified({
         participantId,
         encryptedAadhaar,
+        aadhaarLast4: aadhaarDigits.slice(-4),
         demoDisplayName: demoIdentityForAadhaar(aadhaarDigits)?.displayName,
       })
     } catch {
@@ -125,14 +129,14 @@ export function AadhaarOtpDialog({
 
         {!otpSent ? (
           <form onSubmit={sendOtp} className="auth-form" noValidate>
-            <Input id={aadhaarId} label="Aadhaar number" value={identifier} onChange={(event) => setIdentifier(formatAadhaar(event.target.value))} inputMode="numeric" autoComplete="off" placeholder="XXXX XXXX XXXX" hint="Any 12-digit number is accepted for this local simulation." error={error || undefined} />
-            <div className="demo-identity-options" aria-label="Demo Aadhaar profiles">
+            <Input id={aadhaarId} label="Aadhaar number" value={identifier} onChange={(event) => setIdentifier(formatAadhaar(event.target.value))} inputMode="numeric" autoComplete="off" placeholder="XXXX XXXX XXXX" hint={fixedIdentity ? `${fixedIdentity.displayName} is preselected for this party demo.` : 'Any 12-digit number is accepted for this local simulation.'} error={error || undefined} disabled={Boolean(fixedIdentity)} />
+            {!fixedIdentity ? <div className="demo-identity-options" aria-label="Demo Aadhaar profiles">
               {DEMO_IDENTITIES.map((identity) => (
                 <button type="button" key={identity.aadhaar} aria-label={`Prefill ${identity.displayName} Aadhaar ${formatAadhaar(identity.aadhaar)}`} onClick={() => { setIdentifier(formatAadhaar(identity.aadhaar)); setError('') }}>
                   <span><strong>{identity.displayName}</strong><small>{identity.roleLabel} demo</small></span><span>{formatAadhaar(identity.aadhaar)}</span>
                 </button>
               ))}
-            </div>
+            </div> : null}
             <div className="action-stack"><Button type="submit">Send OTP</Button>{onCancel ? <Button variant="ghost" onClick={onCancel}>Cancel</Button> : null}</div>
           </form>
         ) : (

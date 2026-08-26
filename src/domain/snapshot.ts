@@ -77,6 +77,8 @@ function isParty(value: unknown, role: PartyRole): boolean {
       typeof party.identityVerifiedVersion === 'number' && Number.isInteger(party.identityVerifiedVersion) && party.identityVerifiedVersion > 0
     )) &&
     (party.identityVerifiedAt === undefined || typeof party.identityVerifiedAt === 'string') &&
+    (party.identityVerifiedParticipantId === undefined || typeof party.identityVerifiedParticipantId === 'string') &&
+    (party.identityVerifiedAadhaarLast4 === undefined || (typeof party.identityVerifiedAadhaarLast4 === 'string' && /^\d{4}$/.test(party.identityVerifiedAadhaarLast4))) &&
     typeof party.approvedAgreement === 'boolean' &&
     typeof party.signed === 'boolean'
   )
@@ -219,7 +221,7 @@ export function isAgreementState(value: unknown): value is AgreementState {
     typeof state.requirements.stampDutyAmount === 'number' &&
     typeof state.requirements.registrationRequired === 'boolean' &&
     typeof state.requirements.notarizationOptional === 'boolean' &&
-    typeof state.agreementVersion === 'number' &&
+    typeof state.agreementVersion === 'number' && Number.isInteger(state.agreementVersion) && state.agreementVersion > 0 &&
     typeof state.finalized === 'boolean' &&
     (state.finalizedBy === undefined || isPartyRole(state.finalizedBy)) &&
     (state.finalizedAt === undefined || typeof state.finalizedAt === 'string') &&
@@ -240,8 +242,97 @@ export function isAgreementState(value: unknown): value is AgreementState {
     (state.tenantSignature === undefined || isSignatureRecord(state.tenantSignature)) &&
     (state.signingStatus === undefined || ['not-started', 'partially-signed', 'complete'].includes(state.signingStatus)) &&
     (state.signingEvents === undefined || (Array.isArray(state.signingEvents) && state.signingEvents.every(isSigningEvent))) &&
-    (state.lastUpdatedBy === undefined || isPartyRole(state.lastUpdatedBy))
+    (state.lastUpdatedBy === undefined || isPartyRole(state.lastUpdatedBy)) &&
+    hasConsistentAgreementState(state as AgreementState)
   )
+}
+
+function contributionComplete(status: StampDutyContribution['status']): boolean {
+  return status === 'paid' || status === 'not-required'
+}
+
+function verifiedPartyIsConsistent(agreement: AgreementState, role: PartyRole): boolean {
+  const party = agreement[role]
+  if (!party.identityVerified) {
+    return party.identityVerifiedVersion === undefined && party.identityVerifiedAt === undefined &&
+      party.identityVerifiedParticipantId === undefined && party.identityVerifiedAadhaarLast4 === undefined
+  }
+  if (party.identityVerifiedVersion !== agreement.agreementVersion || !party.identityVerifiedAt) return false
+  const hasEvidence = party.identityVerifiedParticipantId !== undefined || party.identityVerifiedAadhaarLast4 !== undefined
+  if (!hasEvidence) return true // Accept snapshots created before participant evidence was added.
+  return Boolean(
+    party.participantId &&
+    party.identityVerifiedParticipantId === party.participantId &&
+    party.identityVerifiedAadhaarLast4,
+  )
+}
+
+function signatureIsConsistent(agreement: AgreementState, role: PartyRole): boolean {
+  const signature = role === 'landlord' ? agreement.landlordSignature : agreement.tenantSignature
+  if (!signature) return !agreement[role].signed
+  return Boolean(
+    agreement[role].signed &&
+    agreement.finalDocumentHash &&
+    agreement.documentId &&
+    signature.signerRole === role &&
+    signature.signerName === agreement[role].name &&
+    signature.signedVersion === agreement.agreementVersion &&
+    signature.signedDocumentHash === agreement.finalDocumentHash,
+  )
+}
+
+function hasConsistentAgreementState(agreement: AgreementState): boolean {
+  const stepIndex = [...validSteps].indexOf(agreement.workflowStep)
+  const finalizedIndex = [...validSteps].indexOf('finalized')
+  const identityIndex = [...validSteps].indexOf('identity')
+  const notaryIndex = [...validSteps].indexOf('notary')
+  const signIndex = [...validSteps].indexOf('sign')
+  const completeIndex = [...validSteps].indexOf('complete')
+  const finalizedVersion = agreement.review?.finalizedVersion
+
+  if (agreement.finalized) {
+    if (!agreement.finalizedAt || finalizedVersion !== agreement.agreementVersion || !agreement.review ||
+      agreement.review.proposals.some((proposal) => proposal.status === 'pending') ||
+      agreement.review.landlordApprovedVersion !== agreement.agreementVersion ||
+      agreement.review.tenantApprovedVersion !== agreement.agreementVersion ||
+      !agreement.landlord.approvedAgreement || !agreement.tenant.approvedAgreement) return false
+  } else if (agreement.finalizedAt || agreement.finalizedBy || finalizedVersion !== undefined || stepIndex >= finalizedIndex) {
+    return false
+  }
+
+  const paymentComplete = agreement.stampDutyPayment
+    ? contributionComplete(agreement.stampDutyPayment.landlord.status) && contributionComplete(agreement.stampDutyPayment.tenant.status)
+    : false
+  if (agreement.stampCompleted !== paymentComplete) return false
+  if (stepIndex >= identityIndex && !agreement.stampCompleted) return false
+  if (!verifiedPartyIsConsistent(agreement, 'landlord') || !verifiedPartyIsConsistent(agreement, 'tenant')) return false
+  const bothVerified = agreement.landlord.identityVerified && agreement.tenant.identityVerified
+  if (stepIndex >= notaryIndex && !bothVerified) return false
+
+  if (agreement.notarizationStatus === 'skipped' && !agreement.requirements.notarizationOptional) return false
+  if (agreement.notarizationStatus === 'completed') {
+    if (!agreement.notarized || agreement.notarizedAgreementVersion !== agreement.agreementVersion ||
+      !agreement.notaryDisplayName || !agreement.notaryRegistrationId || !agreement.notarizationCompletedAt) return false
+  } else if (agreement.notarized || agreement.notarizedAgreementVersion || agreement.notarizationCompletedAt) {
+    return false
+  }
+  if (stepIndex >= signIndex) {
+    const resolved = agreement.notarizationStatus === 'completed' ||
+      (agreement.notarizationStatus === 'skipped' && agreement.requirements.notarizationOptional)
+    if (!resolved) return false
+  }
+
+  if (!signatureIsConsistent(agreement, 'landlord') || !signatureIsConsistent(agreement, 'tenant')) return false
+  const signatureCount = Number(Boolean(agreement.landlordSignature)) + Number(Boolean(agreement.tenantSignature))
+  const expectedSigningStatus = signatureCount === 2 ? 'complete' : signatureCount === 1 ? 'partially-signed' : 'not-started'
+  if (agreement.signingStatus !== undefined && agreement.signingStatus !== expectedSigningStatus) return false
+  if (agreement.finalDocumentHash) {
+    const expectedDocumentId = agreement.finalDocumentHash.slice(0, 12).toUpperCase().match(/.{1,4}/g)?.join('-')
+    if (agreement.documentId !== expectedDocumentId || stepIndex < signIndex) return false
+  } else if (agreement.documentId || signatureCount) return false
+  if (signatureCount && stepIndex < signIndex) return false
+  if (stepIndex >= completeIndex && signatureCount !== 2) return false
+  return true
 }
 
 function isSnapshot(value: unknown): value is WorkflowSnapshotEnvelope {
@@ -254,10 +345,15 @@ function isSnapshot(value: unknown): value is WorkflowSnapshotEnvelope {
     Number.isInteger(snapshot.furthestStepIndex) &&
     snapshot.furthestStepIndex >= 0 &&
     snapshot.furthestStepIndex <= 10 &&
+    snapshot.furthestStepIndex >= workflowIndex(snapshot.agreement.workflowStep) &&
     (snapshot.invitedRole === undefined || isPartyRole(snapshot.invitedRole)) &&
     (snapshot.documentName === undefined || typeof snapshot.documentName === 'string') &&
     (snapshot.documentNameCustomized === undefined || typeof snapshot.documentNameCustomized === 'boolean')
   )
+}
+
+function workflowIndex(step: WorkflowStep): number {
+  return [...validSteps].indexOf(step)
 }
 
 export function encodeSnapshot(snapshot: WorkflowSnapshotEnvelope): string {

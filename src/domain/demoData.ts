@@ -53,7 +53,7 @@ export const workflowSteps: readonly WorkflowStepConfig[] = [
     id: 'review',
     title: 'Review',
     kicker: 'Collaborate',
-    description: 'Show the landlord and tenant review flow with a placeholder negotiation loop.',
+    description: 'Let the landlord and tenant review clauses, propose changes, and approve one version.',
     placeholderPoints: [
       'Clause-level review panel.',
       'Deposit refund proposal flow.',
@@ -68,14 +68,14 @@ export const workflowSteps: readonly WorkflowStepConfig[] = [
     placeholderPoints: [
       'Agreement version tracking.',
       'Approval statuses for both parties.',
-      'Document hash or evidence placeholder.',
+      'Read-only final agreement prepared for execution.',
     ],
   },
   {
     id: 'stamp',
     title: 'Stamp duty',
     kicker: 'Execution step',
-    description: 'Reserve space for the simulated payment and e-stamp flow.',
+    description: 'Configure and complete the simulated stamp-duty contribution flow.',
     placeholderPoints: [
       'Demo stamp duty amount.',
       'Payment and success states.',
@@ -97,7 +97,7 @@ export const workflowSteps: readonly WorkflowStepConfig[] = [
     id: 'notary',
     title: 'Notary',
     kicker: 'Optional',
-    description: 'Leave room for the optional attestation choice and simulated meeting room.',
+    description: 'Choose whether to add the configured simulated notarial attestation.',
     placeholderPoints: [
       'Add notarisation or skip.',
       'Static notary profile for the demo.',

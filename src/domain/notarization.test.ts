@@ -12,8 +12,8 @@ import {
 function verifiedAgreement() {
   let agreement = createInitialAgreementState()
   agreement = { ...agreement, finalized: true, stampCompleted: true, agreementVersion: 2 }
-  agreement = verifyPartyForExecution(agreement, 'landlord')
-  return verifyPartyForExecution(agreement, 'tenant')
+  agreement = verifyPartyForExecution(agreement, 'landlord', { participantId: 'landlord-demo', aadhaarLast4: '6666' })
+  return verifyPartyForExecution(agreement, 'tenant', { participantId: 'tenant-demo', aadhaarLast4: '3333' })
 }
 
 describe('notarisation', () => {
@@ -47,5 +47,12 @@ describe('notarisation', () => {
   it('does not treat completed evidence as valid after a version change', () => {
     const agreement = attestAgreement(verifiedAgreement())
     expect(isNotarizationResolved({ ...agreement, agreementVersion: 3 })).toBe(false)
+  })
+
+  it('does not allow skipping when notarisation is configured as required', () => {
+    const agreement = verifiedAgreement()
+    agreement.requirements.notarizationOptional = false
+    expect(skipNotarization(agreement)).toBe(agreement)
+    expect(isNotarizationResolved({ ...agreement, notarizationStatus: 'skipped' })).toBe(false)
   })
 })

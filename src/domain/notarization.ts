@@ -19,7 +19,7 @@ export function resolveNotarizationStatus(agreement: AgreementState): Notarizati
 
 export function isNotarizationResolved(agreement: AgreementState): boolean {
   const status = resolveNotarizationStatus(agreement)
-  return status === 'skipped' || (
+  return (status === 'skipped' && agreement.requirements.notarizationOptional) || (
     status === 'completed' &&
     agreement.notarized &&
     agreement.notarizedAgreementVersion === agreement.agreementVersion
@@ -27,7 +27,7 @@ export function isNotarizationResolved(agreement: AgreementState): boolean {
 }
 
 export function skipNotarization(agreement: AgreementState): AgreementState {
-  if (!areBothPartiesVerified(agreement) || !agreement.finalized || !agreement.stampCompleted) return agreement
+  if (!agreement.requirements.notarizationOptional || !areBothPartiesVerified(agreement) || !agreement.finalized || !agreement.stampCompleted) return agreement
   return {
     ...agreement,
     notarizationStatus: 'skipped',

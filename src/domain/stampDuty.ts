@@ -63,6 +63,12 @@ export function isStampDutyComplete(payment: StampDutyPaymentState): boolean {
   })
 }
 
+export function prepareStampDutyStep(agreement: AgreementState): AgreementState {
+  if (agreement.requirements.stampDutyAmount !== 0) return agreement
+  const stampDutyPayment = stampDutyPaymentFor(agreement)
+  return { ...agreement, stampDutyPayment, stampCompleted: isStampDutyComplete(stampDutyPayment) }
+}
+
 function createPaymentReference(role: PartyRole, paidAt: string): string {
   const compactTime = paidAt.replace(/\D/g, '').slice(0, 14)
   const suffix = globalThis.crypto?.randomUUID?.().replace(/-/g, '').slice(0, 6).toUpperCase()

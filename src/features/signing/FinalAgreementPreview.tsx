@@ -1,7 +1,7 @@
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import type { AgreementState, PartyRole, SignatureRecord } from '../../domain/types'
-import { finalAgreementVersion, signatureMatchesFinalAgreement } from '../../domain/signing'
+import { finalAgreementInventory, finalAgreementVersion, signatureMatchesFinalAgreement } from '../../domain/signing'
 
 interface FinalAgreementPreviewProps {
   agreement: AgreementState
@@ -42,8 +42,37 @@ function SignatureBlock({ agreement, role, signature }: {
 }
 
 export function FinalAgreementPreview({ agreement, onClose }: FinalAgreementPreviewProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const inventory = finalAgreementInventory(agreement)
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null
+    dialogRef.current?.querySelector<HTMLElement>('button')?.focus()
+    return () => previousFocus?.focus()
+  }, [])
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onClose()
+      return
+    }
+    if (event.key !== 'Tab' || !dialogRef.current) return
+    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'))
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable.at(-1)!
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
   return (
-    <div className="esign-preview-layer" role="dialog" aria-modal="true" aria-labelledby="final-agreement-title">
+    <div ref={dialogRef} className="esign-preview-layer" role="dialog" aria-modal="true" aria-labelledby="final-agreement-title" onKeyDown={handleKeyDown}>
       <div className="esign-preview-shell">
         <header className="esign-preview-toolbar">
           <div><strong>Final agreement</strong><small>Read-only · Version {finalAgreementVersion(agreement)}</small></div>
@@ -63,11 +92,11 @@ export function FinalAgreementPreview({ agreement, onClose }: FinalAgreementPrev
               <section key={clause.id}><h3>{index + 1}. {clause.title}</h3><p>{clause.text}</p></section>
             ))}
           </div>
-          {agreement.agreementBuilder?.furnishing.inventory.length ? (
+          {inventory.length ? (
             <section className="inventory-schedule">
               <h3>Schedule A — Furnishings, fixtures and inventory</h3>
-              <div className="inventory-table-wrap"><table><thead><tr><th>Item</th><th>Qty</th><th>Condition</th></tr></thead><tbody>
-                {agreement.agreementBuilder.furnishing.inventory.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.quantity}</td><td>{item.condition}</td></tr>)}
+              <div className="inventory-table-wrap"><table><thead><tr><th>Item</th><th>Qty</th><th>Condition</th><th>Notes</th></tr></thead><tbody>
+                {inventory.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.quantity}</td><td>{item.condition}</td><td>{item.notes || '—'}</td></tr>)}
               </tbody></table></div>
             </section>
           ) : null}
@@ -84,3 +113,4 @@ export function FinalAgreementPreview({ agreement, onClose }: FinalAgreementPrev
     </div>
   )
 }
+import { useEffect, useRef } from 'react'

@@ -57,7 +57,7 @@ button { color: inherit; }
   gap: 11px;
   background: transparent;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
 
 .brand-logo { width: 104px; height: 104px; object-fit: contain; filter: drop-shadow(0 9px 16px rgba(10, 64, 130, .16)); }
@@ -97,6 +97,21 @@ button { color: inherit; }
   font-size: 1.2rem;
   cursor: pointer;
 }
+
+.party-demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #e5cf99;
+  border-radius: 16px;
+  background: #fff8e6;
+  color: #654819;
+}
+.party-demo-banner > span { display: grid; gap: 4px; }
+.party-demo-banner small { color: #806638; }
 
 h1, h2, p { margin-top: 0; }
 h1, h2 { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.025em; }
@@ -218,6 +233,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   font-weight: 750;
   cursor: pointer;
 }
+.profile-trigger-locked { cursor: default; background: #f3f5f2; color: var(--muted); }
 .profile-avatar { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: white; }
 .profile-popover {
   position: absolute;
@@ -309,6 +325,9 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .review-page-heading h1 { max-width: 12ch; font-size: clamp(2.4rem, 4vw, 4rem); }
 .review-role-control { flex: 0 0 min(320px, 100%); display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .review-role-control label { color: var(--muted); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.review-role-control > small { color: var(--muted); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.review-role-control > strong { font-size: .84rem; }
+.review-role-control > .btn { justify-self: start; margin-top: 3px; min-height: 36px; padding: 7px 12px; font-size: .75rem; }
 .review-role-control select { width: 100%; border: 0; background: transparent; color: var(--text); font-weight: 750; outline: 0; }
 .review-status-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid var(--border); border-radius: 16px; background: var(--cream); }
 .review-status-bar > span { min-width: 105px; display: grid; gap: 2px; padding-right: 14px; border-right: 1px solid var(--border); }
@@ -669,6 +688,8 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 @media (max-width: 640px) {
   .page { padding: 14px; }
   .site-header { align-items: flex-start; }
+  .party-demo-banner { align-items: stretch; flex-direction: column; }
+  .party-demo-banner .btn { width: 100%; }
   .brand-logo { width: 76px; height: 76px; }
   .header-actions .badge, .citizen-name { display: none; }
   .header-actions .btn { min-height: 38px; padding: 8px 11px; font-size: .76rem; }

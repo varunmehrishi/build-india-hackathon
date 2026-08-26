@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from './components/ui/Badge'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
@@ -22,7 +22,14 @@ import {
 } from './domain/identityVerification'
 import { attestAgreement, isNotarizationResolved, skipNotarization } from './domain/notarization'
 import { finalizeReviewedAgreement, resolveReviewState } from './domain/review'
-import { replaceSnapshotUrl, snapshotFromLocation, type WorkflowSnapshotEnvelope } from './domain/snapshot'
+import {
+  createSnapshotUrl,
+  decodeSnapshot,
+  encodeSnapshot,
+  replaceSnapshotUrl,
+  snapshotFromLocation,
+  type WorkflowSnapshotEnvelope,
+} from './domain/snapshot'
 import {
   areAllSignaturesComplete,
   hasAnySignature,
@@ -30,21 +37,24 @@ import {
   recordSignature,
   recordSignatureCancellation,
 } from './domain/signing'
-import { configureStampDutyPayment, isStampDutyComplete, recordStampDutyPayment } from './domain/stampDuty'
+import { configureStampDutyPayment, isStampDutyComplete, prepareStampDutyStep, recordStampDutyPayment } from './domain/stampDuty'
 import type { AgreementBuilderConfiguration, AgreementState, IntakeDraft, WorkflowStep } from './domain/types'
 import {
   activeDocument,
   addNewDocument,
+  createWorkspace,
   documentLabel,
   importSnapshot,
   loadWorkspace,
   replaceActiveWithNewDocument,
   saveWorkspace,
+  snapshotImportStatus,
   updateDocument,
   type LocalWorkspace,
   type StoredDocument,
 } from './domain/workspace'
 import { AuthGate } from './features/auth/AuthGate'
+import type { AadhaarVerificationResult } from './features/auth/AadhaarOtpDialog'
 import { AgreementBuilder } from './features/agreement/AgreementBuilder'
 import { ProfileMenu } from './features/auth/ProfileMenu'
 import { FinalizedView } from './features/finalized/FinalizedView'
@@ -60,10 +70,27 @@ import { ESignScreen } from './features/signing/ESignScreen'
 
 type AuthState = DemoAuthSession | null | undefined
 const finalizedStepIndex = workflowStepOrder.indexOf('finalized')
+const reviewStepIndex = workflowStepOrder.indexOf('review')
 const stampStepIndex = workflowStepOrder.indexOf('stamp')
 const identityStepIndex = workflowStepOrder.indexOf('identity')
 const notaryStepIndex = workflowStepOrder.indexOf('notary')
 const signStepIndex = workflowStepOrder.indexOf('sign')
+const COLLABORATION_MESSAGE = 'saral-setu-party-update'
+
+interface CollaborationContext {
+  role: 'landlord' | 'tenant'
+  returnRole: 'landlord' | 'tenant'
+}
+
+function collaborationContextFromLocation(): CollaborationContext | null {
+  const parameters = new URLSearchParams(window.location.search)
+  if (parameters.get('partyDemo') !== '1') return null
+  const role = parameters.get('partyRole')
+  const returnRole = parameters.get('returnRole')
+  if ((role !== 'landlord' && role !== 'tenant') || (returnRole !== 'landlord' && returnRole !== 'tenant')) return null
+  if (role === returnRole) return null
+  return { role, returnRole }
+}
 
 function roleName(snapshot: WorkflowSnapshotEnvelope | null): string | undefined {
   if (!snapshot?.invitedRole) return undefined
@@ -88,7 +115,18 @@ function canBindParticipant(document: StoredDocument, role: 'landlord' | 'tenant
 
 function App() {
   const initialShare = useMemo(() => snapshotFromLocation(), [])
-  const [workspace, setWorkspace] = useState<LocalWorkspace>(() => loadWorkspace())
+  const collaboration = useMemo(() => {
+    const context = collaborationContextFromLocation()
+    return context && initialShare?.ok && initialShare.snapshot.invitedRole === context.role ? context : null
+  }, [initialShare])
+  const [workspace, setWorkspace] = useState<LocalWorkspace>(() => (
+    collaboration && initialShare?.ok
+      ? importSnapshot(createWorkspace(), initialShare.snapshot)
+      : loadWorkspace()
+  ))
+  const workspaceRef = useRef(workspace)
+  const partyWindowRef = useRef<Window | null>(null)
+  const signingOperationRef = useRef(0)
   const [notice, setNotice] = useState(initialShare && !initialShare.ok ? initialShare.error : '')
   const [authSession, setAuthSession] = useState<AuthState>(undefined)
   const [shareSource, setShareSource] = useState<StoredDocument | null>(null)
@@ -104,22 +142,34 @@ function App() {
   const activeRole = (storedRoleMatchesIdentity ? document.localRole : undefined)
     ?? (authSession ? roleForAgreement(authSession, state.agreementId) : undefined)
     ?? (!state.intakeCompleted ? (draft.initiator || undefined) : undefined)
-  const identityViewingRole = state.identityVerificationRole
+  const identityViewingRole = activeRole
+    ?? state.identityVerificationRole
     ?? state.review?.currentRole
     ?? activeRole
     ?? state.initiator
-  const signingRole = state.signingRole ?? state.identityVerificationRole ?? state.initiator
+  const signingRole = activeRole ?? state.signingRole ?? state.identityVerificationRole ?? state.initiator
 
   useEffect(() => {
     let cancelled = false
     void restoreAuthSession().then((restored) => {
       if (cancelled) return
-      let nextWorkspace = workspace
+      let nextWorkspace = workspaceRef.current
+      if (collaboration) {
+        restored = null
+        if (initialShare) replaceSnapshotUrl(null)
+        setAuthSession(null)
+        return
+      }
       if (initialShare?.ok) {
-        nextWorkspace = importSnapshot(workspace, initialShare.snapshot)
-        saveWorkspace(nextWorkspace)
-        setWorkspace(nextWorkspace)
-        setNotice('Shared agreement imported into this browser.')
+        if (snapshotImportStatus(nextWorkspace, initialShare.snapshot) === 'older-than-local') {
+          setNotice('This shared copy is older than the agreement already saved in this browser, so it was not imported.')
+        } else {
+          nextWorkspace = importSnapshot(nextWorkspace, initialShare.snapshot)
+          workspaceRef.current = nextWorkspace
+          saveWorkspace(nextWorkspace)
+          setWorkspace(nextWorkspace)
+          setNotice('Shared agreement imported into this browser.')
+        }
       }
       if (initialShare) replaceSnapshotUrl(null)
 
@@ -150,27 +200,76 @@ function App() {
     return () => { cancelled = true }
     // Bootstrap once from browser storage and the incoming URL package.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [collaboration, initialShare])
+
+  useEffect(() => {
+    if (collaboration) return
+    function receivePartyUpdate(event: MessageEvent) {
+      if (event.origin !== window.location.origin || event.source !== partyWindowRef.current) return
+      const data = event.data as { type?: unknown; snapshot?: unknown }
+      if (data?.type !== COLLABORATION_MESSAGE || typeof data.snapshot !== 'string') return
+      const decoded = decodeSnapshot(data.snapshot)
+      if (!decoded.ok) {
+        setNotice('The other-party update could not be read.')
+        return
+      }
+      const current = workspaceRef.current
+      if (snapshotImportStatus(current, decoded.snapshot) === 'older-than-local') {
+        setNotice('An older other-party update was ignored because this browser has a newer revision.')
+        return
+      }
+      const next = importSnapshot(current, decoded.snapshot)
+      workspaceRef.current = next
+      saveWorkspace(next)
+      setWorkspace(next)
+      setNotice(`${decoded.snapshot.agreement[decoded.snapshot.agreement.lastUpdatedBy ?? decoded.snapshot.agreement.initiator].name}'s update was added to the shared agreement.`)
+    }
+    window.addEventListener('message', receivePartyUpdate)
+    return () => window.removeEventListener('message', receivePartyUpdate)
+  }, [collaboration])
+
+  function snapshotFor(documentToShare: StoredDocument, invitedRole?: 'landlord' | 'tenant'): WorkflowSnapshotEnvelope {
+    return {
+      codecVersion: 1,
+      agreement: documentToShare.agreement,
+      furthestStepIndex: documentToShare.furthestStepIndex,
+      invitedRole,
+      documentName: documentToShare.intakeDraft.documentName,
+      documentNameCustomized: documentToShare.documentNameCustomized,
+    }
+  }
+
+  function postPartyUpdate(nextWorkspace: LocalWorkspace): boolean {
+    if (!collaboration || !window.opener || window.opener.closed) return false
+    const updatedDocument = activeDocument(nextWorkspace)
+    window.opener.postMessage({
+      type: COLLABORATION_MESSAGE,
+      snapshot: encodeSnapshot(snapshotFor(updatedDocument, collaboration.returnRole)),
+    }, window.location.origin)
+    return true
+  }
 
   function persistWorkspace(next: LocalWorkspace) {
-    saveWorkspace(next)
+    workspaceRef.current = next
+    if (collaboration) postPartyUpdate(next)
+    else saveWorkspace(next)
     setWorkspace(next)
   }
 
   function mutateWorkspace(transform: (current: LocalWorkspace) => LocalWorkspace) {
-    setWorkspace((current) => {
-      const next = transform(current)
-      saveWorkspace(next)
-      return next
-    })
+    persistWorkspace(transform(workspaceRef.current))
   }
 
   function mutateActiveDocument(updater: (current: StoredDocument) => StoredDocument) {
     mutateWorkspace((current) => updateDocument(current, current.activeDocumentId, updater))
   }
 
+  function mutateDocumentById(agreementId: string, updater: (current: StoredDocument) => StoredDocument) {
+    mutateWorkspace((current) => updateDocument(current, agreementId, updater))
+  }
+
   function persistSession(session: DemoAuthSession) {
-    saveAuthSession(session)
+    if (!collaboration) saveAuthSession(session)
     setAuthSession(session)
   }
 
@@ -207,15 +306,22 @@ function App() {
       const participantId = state[role].participantId
       if (canBindParticipant(document, role, session.participantId)) {
         nextSession = bindRole(session, state.agreementId, role)
-        if (!participantId) {
-          mutateActiveDocument((current) => ({
-            ...current,
-            agreement: {
-              ...current.agreement,
-              [role]: { ...current.agreement[role], participantId: session.participantId },
-            },
-          }))
-        }
+        mutateActiveDocument((current) => ({
+          ...current,
+          agreement: {
+            ...current.agreement,
+            [role]: { ...current.agreement[role], participantId: participantId ?? session.participantId },
+            review: current.agreement.review
+              ? { ...current.agreement.review, currentRole: role }
+              : current.agreement.review,
+            identityVerificationRole: role,
+            signingRole: role,
+            snapshotRevision: current.agreement.intakeCompleted
+              ? current.agreement.snapshotRevision + 1
+              : current.agreement.snapshotRevision,
+            lastUpdatedBy: current.agreement.intakeCompleted ? role : current.agreement.lastUpdatedBy,
+          },
+        }))
       } else {
         setNotice(`This ${role} role is already linked to the other demo identity.`)
       }
@@ -224,7 +330,7 @@ function App() {
   }
 
   async function logout() {
-    await clearAuthSession()
+    if (!collaboration) await clearAuthSession()
     setShareSource(null)
     setAuthSession(null)
   }
@@ -256,18 +362,23 @@ function App() {
     if (offset > 0 && state.workflowStep === 'sign' && !areAllSignaturesComplete(state)) return
     const minimumIndex = state.finalized ? finalizedStepIndex : 0
     const nextIndex = Math.max(minimumIndex, Math.min(workflowSteps.length - 1, activeIndex + offset))
-    mutateActiveDocument((current) => ({
-      ...current,
-      furthestStepIndex: Math.max(current.furthestStepIndex, nextIndex),
-      agreement: {
-        ...current.agreement,
-        workflowStep: workflowSteps[nextIndex].id,
-        snapshotRevision: current.agreement.intakeCompleted
-          ? current.agreement.snapshotRevision + 1
-          : current.agreement.snapshotRevision,
-        lastUpdatedBy: current.agreement.intakeCompleted ? activeRole : current.agreement.lastUpdatedBy,
-      },
-    }))
+    mutateActiveDocument((current) => {
+      const prepared = workflowSteps[nextIndex].id === 'stamp'
+        ? prepareStampDutyStep(current.agreement)
+        : current.agreement
+      return {
+        ...current,
+        furthestStepIndex: Math.max(current.furthestStepIndex, nextIndex),
+        agreement: {
+          ...prepared,
+          workflowStep: workflowSteps[nextIndex].id,
+          snapshotRevision: current.agreement.intakeCompleted
+            ? current.agreement.snapshotRevision + 1
+            : current.agreement.snapshotRevision,
+          lastUpdatedBy: current.agreement.intakeCompleted ? activeRole : current.agreement.lastUpdatedBy,
+        },
+      }
+    })
   }
 
   function beginRentWorkflow(intentText: string) {
@@ -280,8 +391,12 @@ function App() {
 
   function updateProfileName(displayName: string) {
     if (!authSession) return
+    if (activeIndex >= reviewStepIndex) {
+      setNotice('Party names are locked once agreement review begins.')
+      return
+    }
     persistSession({ ...authSession, displayName })
-    if (state.finalized || !activeRole) return
+    if (!activeRole) return
 
     mutateActiveDocument((current) => {
       const field = activeRole === 'landlord' ? 'landlordName' : 'tenantName'
@@ -454,16 +569,19 @@ function App() {
   function configureStampDuty(landlordPercentage: number) {
     if (!activeRole || state.workflowStep !== 'stamp') return
     try {
-      mutateActiveDocument((current) => ({
-        ...current,
-        agreement: {
-          ...current.agreement,
-          stampDutyPayment: configureStampDutyPayment(current.agreement, landlordPercentage, activeRole),
-          stampCompleted: false,
-          snapshotRevision: current.agreement.snapshotRevision + 1,
-          lastUpdatedBy: activeRole,
-        },
-      }))
+      mutateActiveDocument((current) => {
+        const stampDutyPayment = configureStampDutyPayment(current.agreement, landlordPercentage, activeRole)
+        return {
+          ...current,
+          agreement: {
+            ...current.agreement,
+            stampDutyPayment,
+            stampCompleted: isStampDutyComplete(stampDutyPayment),
+            snapshotRevision: current.agreement.snapshotRevision + 1,
+            lastUpdatedBy: activeRole,
+          },
+        }
+      })
       setNotice(`Payment split updated by the ${activeRole}.`)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'The payment split could not be updated.')
@@ -492,30 +610,27 @@ function App() {
       : `Your contribution is complete. Share the document with the ${activeRole === 'landlord' ? 'tenant' : 'landlord'} to continue.`)
   }
 
-  function updateIdentityViewingRole(role: 'landlord' | 'tenant') {
+  function verifyIdentity(role: 'landlord' | 'tenant', result: AadhaarVerificationResult) {
+    if (role !== identityViewingRole || state.workflowStep !== 'identity') return false
+    const expectedParticipant = state[role].participantId
+    if (expectedParticipant && expectedParticipant !== result.participantId) {
+      setNotice(`Use the Aadhaar identity linked to ${state[role].name}.`)
+      return false
+    }
     mutateActiveDocument((current) => ({
       ...current,
       agreement: {
-        ...current.agreement,
-        identityVerificationRole: role,
-        snapshotRevision: current.agreement.snapshotRevision + 1,
-        lastUpdatedBy: role,
-      },
-    }))
-  }
-
-  function verifyIdentity(role: 'landlord' | 'tenant') {
-    if (role !== identityViewingRole || state.workflowStep !== 'identity') return
-    mutateActiveDocument((current) => ({
-      ...current,
-      agreement: {
-        ...verifyPartyForExecution(current.agreement, role),
+        ...verifyPartyForExecution(current.agreement, role, {
+          participantId: result.participantId,
+          aadhaarLast4: result.aadhaarLast4,
+        }),
         identityVerificationRole: role,
         snapshotRevision: current.agreement.snapshotRevision + 1,
         lastUpdatedBy: role,
       },
     }))
     setNotice(`${state[role].name} is verified for Agreement Version ${state.agreementVersion}.`)
+    return true
   }
 
   function continueFromNotary(nextAgreement: AgreementState, message: string) {
@@ -563,10 +678,12 @@ function App() {
   }
 
   const prepareSigning = useCallback(async () => {
+    const agreementId = state.agreementId
+    const startingRevision = state.snapshotRevision
     const prepared = await prepareAgreementForSigning(state)
     if (!prepared.finalDocumentHash || state.finalDocumentHash) return
-    mutateActiveDocument((current) => {
-      if (current.agreement.finalDocumentHash || current.agreement.agreementVersion !== prepared.agreementVersion) return current
+    mutateDocumentById(agreementId, (current) => {
+      if (current.agreement.snapshotRevision !== startingRevision || current.agreement.finalDocumentHash || current.agreement.agreementVersion !== prepared.agreementVersion) return current
       return {
         ...current,
         agreement: {
@@ -580,25 +697,19 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, signingRole])
 
-  function updateSigningRole(role: 'landlord' | 'tenant') {
-    if (state.workflowStep !== 'sign') return
-    mutateActiveDocument((current) => ({
-      ...current,
-      agreement: {
-        ...current.agreement,
-        signingRole: role,
-        snapshotRevision: current.agreement.snapshotRevision + 1,
-        lastUpdatedBy: role,
-      },
-    }))
-  }
-
   async function signAgreement(role: 'landlord' | 'tenant'): Promise<boolean> {
     if (state.workflowStep !== 'sign' || role !== signingRole) return false
+    const operation = signingOperationRef.current
+    const agreementId = state.agreementId
+    const startingRevision = state.snapshotRevision
     const signed = await recordSignature(state, role)
+    if (operation !== signingOperationRef.current) return false
     const signatureField = role === 'landlord' ? 'landlordSignature' : 'tenantSignature'
     if (!signed[signatureField] || signed[signatureField] === state[signatureField]) return false
-    mutateActiveDocument((current) => ({
+    const currentDocument = workspaceRef.current.documents[agreementId]
+    if (!currentDocument || currentDocument.agreement.snapshotRevision !== startingRevision ||
+      currentDocument.agreement.finalDocumentHash !== state.finalDocumentHash) return false
+    mutateDocumentById(agreementId, (current) => ({
       ...current,
       agreement: {
         ...signed,
@@ -612,6 +723,7 @@ function App() {
 
   function cancelSigning(role: 'landlord' | 'tenant') {
     if (state.workflowStep !== 'sign' || role !== signingRole) return
+    signingOperationRef.current += 1
     mutateActiveDocument((current) => ({
       ...current,
       agreement: {
@@ -647,6 +759,38 @@ function App() {
     setShareSource(storedDocument)
   }
 
+  function openOtherParty() {
+    if (!activeRole || collaboration) return
+    const currentDocument = workspaceRef.current.documents[state.agreementId]
+    if (!currentDocument) return
+    const invitedRole = activeRole === 'landlord' ? 'tenant' : 'landlord'
+    const url = new URL(createSnapshotUrl(snapshotFor(currentDocument, invitedRole)))
+    url.searchParams.set('partyDemo', '1')
+    url.searchParams.set('partyRole', invitedRole)
+    url.searchParams.set('returnRole', activeRole)
+    const popup = window.open(
+      url.toString(),
+      'saral-setu-party-demo',
+      'popup=yes,width=1120,height=820,resizable=yes,scrollbars=yes',
+    )
+    if (!popup) {
+      setNotice('The browser blocked the other-party window. Allow popups for this demo and try again.')
+      return
+    }
+    partyWindowRef.current = popup
+    popup.focus()
+    setNotice(`Opened ${state[invitedRole].name}'s demo view.`)
+  }
+
+  function sendUpdateAndClose() {
+    const sent = postPartyUpdate(workspaceRef.current)
+    if (!sent) {
+      setNotice('The original demo window is no longer available. Keep this tab open or share a fresh link.')
+      return
+    }
+    window.close()
+  }
+
   if (authSession === undefined) {
     return <PageContainer><div className="bootstrap-loading" role="status">Opening your local workspace…</div></PageContainer>
   }
@@ -659,25 +803,32 @@ function App() {
         inert={authSession && !shareSource ? undefined : true}
       >
         <header className="site-header">
-          <button type="button" className="brand" onClick={resetWorkflow} aria-label="Saral Setu home">
+          <div className="brand" aria-label="Saral Setu">
             <img className="brand-logo" src={`${import.meta.env.BASE_URL}saral-setu-logo.png`} alt="" />
             <span><strong>Saral Setu</strong><small>Legal journeys, simplified</small></span>
-          </button>
+          </div>
           <nav className="header-actions" aria-label="Demo controls">
             <Badge tone="accent">Hackathon demo</Badge>
-            {authSession ? (
+            {authSession && !collaboration ? (
               <select className="document-select" aria-label="Active document" value={workspace.activeDocumentId} onChange={(event) => selectDocument(event.target.value)}>
                 {Object.values(workspace.documents).map((item) => <option key={item.agreement.agreementId} value={item.agreement.agreementId}>{documentLabel(item)}</option>)}
               </select>
             ) : null}
-            {authSession ? <Button variant="ghost" onClick={createDocument}>New document</Button> : null}
+            {authSession && !collaboration ? <Button variant="ghost" onClick={createDocument}>New document</Button> : null}
             {authSession && activeRole ? <Badge tone="success">You’re the {activeRole}</Badge> : null}
-            {state.finalized && authSession && activeRole ? <Button variant="ghost" onClick={openShare}>Share</Button> : null}
-            <Button variant="ghost" onClick={resetWorkflow}>Reset Demo</Button>
-            {authSession ? <ProfileMenu name={authSession.displayName} onSave={updateProfileName} /> : null}
+            {state.finalized && authSession && activeRole && !collaboration ? <Button variant="ghost" onClick={openShare}>Share</Button> : null}
+            {!collaboration ? <Button variant="ghost" onClick={resetWorkflow}>Reset Demo</Button> : null}
+            {authSession ? <ProfileMenu name={authSession.displayName} onSave={updateProfileName} editable={activeIndex < reviewStepIndex} /> : null}
             {authSession ? <Button variant="secondary" onClick={() => void logout()}>Logout</Button> : null}
           </nav>
         </header>
+
+        {collaboration && authSession ? (
+          <div className="party-demo-banner" role="status">
+            <span><strong>Viewing {state[collaboration.role].name}'s demo</strong><small>Complete this party’s action, then send it to {state[collaboration.returnRole].name}.</small></span>
+            <Button onClick={sendUpdateAndClose}>Send update to {state[collaboration.returnRole].name}</Button>
+          </div>
+        ) : null}
 
         {notice ? <div className="app-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div> : null}
 
@@ -712,13 +863,15 @@ function App() {
                   activeRole={activeRole}
                   onConfigure={configureStampDuty}
                   onPay={payStampDuty}
+                  onOpenOtherParty={collaboration ? undefined : openOtherParty}
                 />
               ) : state.workflowStep === 'identity' ? (
                 <IdentityVerificationScreen
                   agreement={state}
                   viewingRole={identityViewingRole}
-                  onViewingRoleChange={updateIdentityViewingRole}
                   onVerify={verifyIdentity}
+                  onOpenOtherParty={collaboration ? undefined : openOtherParty}
+                  lockDemoIdentity={Boolean(collaboration)}
                 />
               ) : state.workflowStep === 'notary' ? (
                 <NotarizationScreen
@@ -733,17 +886,17 @@ function App() {
                   agreement={state}
                   signingRole={signingRole}
                   onPrepare={prepareSigning}
-                  onRoleChange={updateSigningRole}
                   onSign={signAgreement}
                   onCancel={cancelSigning}
                   onContinue={continueFromSigning}
+                  onOpenOtherParty={collaboration ? undefined : openOtherParty}
                 />
               ) : state.workflowStep === 'requirements' ? (
                 <RequirementsScreen agreement={state} />
               ) : state.workflowStep === 'agreement' ? (
                 <AgreementBuilder agreement={state} onChange={updateAgreementBuilder} />
               ) : state.workflowStep === 'review' ? (
-                <AgreementReview agreement={state} onChange={updateAgreementReview} onFinalize={finalizeDocument} />
+                <AgreementReview agreement={state} viewingRole={activeRole ?? state.initiator} onChange={updateAgreementReview} onFinalize={finalizeDocument} onOpenOtherParty={collaboration ? undefined : openOtherParty} />
               ) : (
                 <Card className="stage-card">
                   <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>
@@ -782,6 +935,7 @@ function App() {
         <AuthGate
           onAuthenticated={authenticate}
           suggestedDisplayName={roleName(initialShare?.ok ? initialShare.snapshot : null) ?? (activeRole ? storedRoleName(document, activeRole) : undefined)}
+          fixedRole={collaboration?.role}
         />
       ) : null}
 

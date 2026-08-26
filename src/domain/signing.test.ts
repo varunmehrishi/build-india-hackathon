@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createInitialAgreementState } from './demoData'
+import { createDefaultAgreementBuilderConfiguration } from './agreementBuilder'
 import {
   areAllSignaturesComplete,
   documentIdFromHash,
@@ -39,6 +40,41 @@ describe('eSign domain', () => {
     expect(await hashAgreement(withVolatileState)).toBe(hash)
     expect(documentIdFromHash(hash)).toMatch(/^[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/)
     expect(serializeFinalAgreement(agreement)).not.toContain('snapshotRevision')
+  })
+
+  it('hashes effective inventory notes but ignores dormant unfurnished inventory', async () => {
+    const configuration = createDefaultAgreementBuilderConfiguration()
+    configuration.furnishing.inventory[0].notes = 'Scratch on left door'
+    const furnished = { ...readyAgreement(), agreementBuilder: configuration }
+    const originalHash = await hashAgreement(furnished)
+
+    const changedNote = {
+      ...furnished,
+      agreementBuilder: {
+        ...configuration,
+        furnishing: {
+          ...configuration.furnishing,
+          inventory: configuration.furnishing.inventory.map((item, index) => index === 0 ? { ...item, notes: 'No scratch' } : item),
+        },
+      },
+    }
+    expect(await hashAgreement(changedNote)).not.toBe(originalHash)
+
+    const unfurnished = {
+      ...furnished,
+      agreementBuilder: { ...configuration, furnishing: { ...configuration.furnishing, level: 'unfurnished' as const } },
+    }
+    const dormantChange = {
+      ...unfurnished,
+      agreementBuilder: {
+        ...unfurnished.agreementBuilder,
+        furnishing: {
+          ...unfurnished.agreementBuilder.furnishing,
+          inventory: unfurnished.agreementBuilder.furnishing.inventory.map((item) => ({ ...item, notes: 'Dormant change' })),
+        },
+      },
+    }
+    expect(await hashAgreement(dormantChange)).toBe(await hashAgreement(unfurnished))
   })
 
   it('prepares one fingerprint and ties both signatures to the same version and hash', async () => {

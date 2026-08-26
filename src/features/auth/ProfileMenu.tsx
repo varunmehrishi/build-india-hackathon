@@ -5,9 +5,10 @@ import { Input } from '../../components/ui/Input'
 interface ProfileMenuProps {
   name: string
   onSave: (name: string) => void
+  editable?: boolean
 }
 
-export function ProfileMenu({ name, onSave }: ProfileMenuProps) {
+export function ProfileMenu({ name, onSave, editable = true }: ProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [draftName, setDraftName] = useState(name)
   const [error, setError] = useState('')
@@ -34,6 +35,16 @@ export function ProfileMenu({ name, onSave }: ProfileMenuProps) {
     setIsOpen(false)
   }
 
+  if (!editable) {
+    return (
+      <div className="profile-trigger profile-trigger-locked" aria-label={`${name}. Party name locked during review and execution.`} title="Party name locked during review and execution">
+        <span className="profile-avatar" aria-hidden="true">{name.charAt(0).toUpperCase()}</span>
+        <span>{name}</span>
+        <span aria-hidden="true">🔒</span>
+      </div>
+    )
+  }
+
   return (
     <div className="profile-menu" ref={containerRef}>
       <button
@@ -41,6 +52,7 @@ export function ProfileMenu({ name, onSave }: ProfileMenuProps) {
         className="profile-trigger"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
+        aria-label={`Edit profile name for ${name}`}
         onClick={() => { setDraftName(name); setError(''); setIsOpen((current) => !current) }}
       >
         <span className="profile-avatar" aria-hidden="true">{name.charAt(0).toUpperCase()}</span>

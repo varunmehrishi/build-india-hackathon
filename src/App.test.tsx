@@ -1,8 +1,14 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { AUTH_STORAGE_KEY, DEMO_OTP, clearAuthSession } from './domain/auth'
+import { participantIdForAadhaar } from './domain/auth'
+import { verifyPartyForExecution } from './domain/identityVerification'
+import { approveCurrentVersion, resolveProposal } from './domain/review'
+import { encodeSnapshot } from './domain/snapshot'
+import { recordSignature } from './domain/signing'
+import type { AgreementState } from './domain/types'
 import { WORKSPACE_STORAGE_KEY, loadWorkspace } from './domain/workspace'
 
 const TEST_AADHAAR = '123456789012'
@@ -32,10 +38,47 @@ async function finalizeDocument(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Continue to Review' }))
   await screen.findByRole('heading', { name: 'Review together' })
   await user.click(screen.getByRole('button', { name: 'Approve this version as Tenant' }))
-  await user.selectOptions(screen.getByLabelText('Viewing as'), 'landlord')
-  await user.click(screen.getByRole('button', { name: 'Approve this version as Landlord' }))
+  await applyOtherPartyUpdate(user, (agreement) => approveCurrentVersion({
+    ...agreement,
+    review: { ...agreement.review!, currentRole: 'landlord' },
+  }))
   await user.click(screen.getByRole('button', { name: 'Finalize Agreement' }))
   await screen.findByRole('heading', { name: 'Final agreement approved' })
+}
+
+async function applyOtherPartyUpdate(
+  user: ReturnType<typeof userEvent.setup>,
+  transform: (agreement: AgreementState) => AgreementState | Promise<AgreementState>,
+) {
+  const popup = { closed: false, focus: vi.fn() } as unknown as Window
+  const open = vi.spyOn(window, 'open').mockReturnValue(popup)
+  const buttons = screen.getAllByRole('button', { name: /View as Landlord/ })
+  await user.click(buttons[0])
+  expect(open).toHaveBeenCalledWith(expect.stringContaining('partyDemo=1'), 'saral-setu-party-demo', expect.any(String))
+
+  const currentWorkspace = loadWorkspace()
+  const currentDocument = currentWorkspace.documents[currentWorkspace.activeDocumentId]
+  const transformed = await transform(currentDocument.agreement)
+  const agreement = {
+    ...transformed,
+    snapshotRevision: currentDocument.agreement.snapshotRevision + 1,
+    lastUpdatedBy: 'landlord' as const,
+  }
+  const snapshot = encodeSnapshot({
+    codecVersion: 1,
+    agreement,
+    furthestStepIndex: currentDocument.furthestStepIndex,
+    invitedRole: 'tenant',
+    documentName: currentDocument.intakeDraft.documentName,
+    documentNameCustomized: currentDocument.documentNameCustomized,
+  })
+  act(() => window.dispatchEvent(new MessageEvent('message', {
+    origin: window.location.origin,
+    source: popup,
+    data: { type: 'saral-setu-party-update', snapshot },
+  })))
+  await waitFor(() => expect(loadWorkspace().documents[currentWorkspace.activeDocumentId].agreement.snapshotRevision).toBe(agreement.snapshotRevision))
+  open.mockRestore()
 }
 
 async function verifyViewedParty(user: ReturnType<typeof userEvent.setup>, role: 'Landlord' | 'Tenant') {
@@ -205,16 +248,20 @@ describe('persistent multi-document journey', () => {
     expect(screen.getByText('Waiting for Arjun Rao')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Approve this version as Tenant' })).toBeDisabled()
 
-    await user.selectOptions(screen.getByLabelText('Viewing as'), 'landlord')
-    await user.click(screen.getByRole('button', { name: 'Accept' }))
+    await applyOtherPartyUpdate(user, (agreement) => resolveProposal(
+      { ...agreement, review: { ...agreement.review!, currentRole: 'landlord' } },
+      agreement.review!.proposals[0].id,
+      'accepted',
+    ))
     expect(screen.getAllByText('Version 2').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /Security Deposit.*within 7 days/i })).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByLabelText('Viewing as'), 'tenant')
     await user.click(screen.getByRole('button', { name: 'Approve this version as Tenant' }))
     expect(screen.getByRole('button', { name: 'Finalize Agreement' })).toBeDisabled()
-    await user.selectOptions(screen.getByLabelText('Viewing as'), 'landlord')
-    await user.click(screen.getByRole('button', { name: 'Approve this version as Landlord' }))
+    await applyOtherPartyUpdate(user, (agreement) => approveCurrentVersion({
+      ...agreement,
+      review: { ...agreement.review!, currentRole: 'landlord' },
+    }))
     await user.click(screen.getByRole('button', { name: 'Finalize Agreement' }))
     expect(await screen.findByRole('heading', { name: 'Final agreement approved' })).toBeInTheDocument()
     expect(screen.getByText('Both parties agreed to Version 2. The document is now locked for execution and remains read-only.')).toBeInTheDocument()
@@ -293,14 +340,18 @@ describe('persistent multi-document journey', () => {
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     await screen.findByRole('heading', { name: 'Verify the people signing' })
 
-    expect(screen.getByLabelText('Viewing as')).toHaveValue('landlord')
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
-    await verifyViewedParty(user, 'Landlord')
-    expect(within(screen.getByRole('region', { name: 'Landlord identity' })).getByText('✓ Verified')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
-
-    await user.selectOptions(screen.getByLabelText('Viewing as'), 'tenant')
     await verifyViewedParty(user, 'Tenant')
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await applyOtherPartyUpdate(user, async (agreement) => {
+      const participantId = await participantIdForAadhaar('444455556666')
+      return verifyPartyForExecution({
+        ...agreement,
+        landlord: { ...agreement.landlord, participantId },
+        identityVerificationRole: 'landlord',
+      }, 'landlord', { participantId, aadhaarLast4: '6666' })
+    })
+    expect(within(screen.getByRole('region', { name: 'Landlord identity' })).getByText('✓ Verified')).toBeInTheDocument()
     expect(screen.getByText('Both parties are ready for execution.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
     const stored = loadWorkspace().documents[loadWorkspace().activeDocumentId].agreement
@@ -349,9 +400,11 @@ describe('persistent multi-document journey', () => {
         await screen.findByText(/stamp duty completed/i)
       }
       if (heading === 'Verify the people signing') {
-        await verifyViewedParty(user, 'Landlord')
-        await user.selectOptions(screen.getByLabelText('Viewing as'), 'tenant')
         await verifyViewedParty(user, 'Tenant')
+        await applyOtherPartyUpdate(user, async (agreement) => {
+          const participantId = await participantIdForAadhaar('444455556666')
+          return verifyPartyForExecution({ ...agreement, landlord: { ...agreement.landlord, participantId } }, 'landlord', { participantId, aadhaarLast4: '6666' })
+        })
       }
       expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     }
@@ -382,14 +435,7 @@ describe('persistent multi-document journey', () => {
     expect(await screen.findByRole('heading', { name: 'Signed successfully' }, { timeout: 3000 })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'View signing progress' }))
     expect(await screen.findByRole('heading', { name: 'Signing progress' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Switch to Landlord' }))
-    expect(await screen.findByText('You are about to sign the same finalized document.')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('checkbox', { name: /I have reviewed and agree/ }))
-    await user.click(screen.getByRole('button', { name: 'Continue to eSign' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm & Sign' }))
-    expect(await screen.findByRole('heading', { name: 'Signed successfully' }, { timeout: 3000 })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'View completion' }))
+    await applyOtherPartyUpdate(user, (agreement) => recordSignature({ ...agreement, signingRole: 'landlord' }, 'landlord'))
     expect(await screen.findByRole('heading', { name: 'All signatures complete' })).toBeInTheDocument()
     expect(await screen.findByText('Document unchanged ✓')).toBeInTheDocument()
 

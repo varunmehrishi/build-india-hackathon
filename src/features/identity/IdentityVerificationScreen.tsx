@@ -4,13 +4,15 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { areBothPartiesVerified, isPartyVerifiedForVersion } from '../../domain/identityVerification'
 import type { AgreementState, PartyRole } from '../../domain/types'
-import { AadhaarOtpDialog } from '../auth/AadhaarOtpDialog'
+import { AadhaarOtpDialog, type AadhaarVerificationResult } from '../auth/AadhaarOtpDialog'
+import { DEMO_IDENTITIES } from '../../domain/auth'
 
 interface IdentityVerificationScreenProps {
   agreement: AgreementState
   viewingRole: PartyRole
-  onViewingRoleChange: (role: PartyRole) => void
-  onVerify: (role: PartyRole) => void
+  onVerify: (role: PartyRole, result: AadhaarVerificationResult) => boolean
+  onOpenOtherParty?: () => void
+  lockDemoIdentity?: boolean
 }
 
 function roleLabel(role: PartyRole): string {
@@ -20,8 +22,9 @@ function roleLabel(role: PartyRole): string {
 export function IdentityVerificationScreen({
   agreement,
   viewingRole,
-  onViewingRoleChange,
   onVerify,
+  onOpenOtherParty,
+  lockDemoIdentity = false,
 }: IdentityVerificationScreenProps) {
   const [verifyingRole, setVerifyingRole] = useState<PartyRole | null>(null)
   const bothVerified = areBothPartiesVerified(agreement)
@@ -36,11 +39,9 @@ export function IdentityVerificationScreen({
             <p className="lede">Confirm both identities against the final agreement before execution begins.</p>
           </div>
           <div className="review-role-control identity-role-control">
-            <label htmlFor="identity-viewing-role">Viewing as</label>
-            <select id="identity-viewing-role" value={viewingRole} onChange={(event) => onViewingRoleChange(event.target.value as PartyRole)}>
-              <option value="tenant">{agreement.tenant.name} — Tenant</option>
-              <option value="landlord">{agreement.landlord.name} — Landlord</option>
-            </select>
+            <small>Viewing as</small>
+            <strong>{agreement[viewingRole].name} — {roleLabel(viewingRole)}</strong>
+            {onOpenOtherParty ? <Button variant="ghost" onClick={onOpenOtherParty}>View as {roleLabel(viewingRole === 'landlord' ? 'tenant' : 'landlord')}</Button> : null}
           </div>
         </header>
 
@@ -64,12 +65,12 @@ export function IdentityVerificationScreen({
                 {verified ? (
                   <div className="identity-verified-detail">
                     <strong>✓ Identity verified</strong>
-                    <span>Agreement Version {party.identityVerifiedVersion}</span>
+                    <span>Agreement Version {party.identityVerifiedVersion}{party.identityVerifiedAadhaarLast4 ? ` · Aadhaar ending ${party.identityVerifiedAadhaarLast4}` : ''}</span>
                   </div>
                 ) : isViewing ? (
                   <Button onClick={() => setVerifyingRole(role)}>Verify Identity</Button>
                 ) : (
-                  <Button variant="ghost" onClick={() => onViewingRoleChange(role)}>View as {roleLabel(role)} to verify</Button>
+                  onOpenOtherParty ? <Button variant="ghost" onClick={onOpenOtherParty}>View as {roleLabel(role)} to verify</Button> : <p className="party-message">Complete this identity check in that party’s demo view.</p>
                 )}
               </section>
             )
@@ -95,10 +96,10 @@ export function IdentityVerificationScreen({
           description={`You are verifying the ${roleLabel(verifyingRole).toLowerCase()} who will execute this finalized agreement.`}
           submitLabel="Verify identity"
           disclaimer="Static hackathon simulation only. Any 12-digit number works, processing stays in this browser, and this is not connected to UIDAI or a government service."
+          fixedIdentity={lockDemoIdentity ? DEMO_IDENTITIES.find((identity) => identity.roleLabel.toLowerCase() === verifyingRole) : undefined}
           onCancel={() => setVerifyingRole(null)}
-          onVerified={() => {
-            onVerify(verifyingRole)
-            setVerifyingRole(null)
+          onVerified={(result) => {
+            if (onVerify(verifyingRole, result)) setVerifyingRole(null)
           }}
         />
       ) : null}

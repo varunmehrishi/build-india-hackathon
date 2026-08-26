@@ -64,6 +64,8 @@ export interface Party {
   identityVerified: boolean
   identityVerifiedVersion?: number
   identityVerifiedAt?: string
+  identityVerifiedParticipantId?: string
+  identityVerifiedAadhaarLast4?: string
   approvedAgreement: boolean
   signed: boolean
 }

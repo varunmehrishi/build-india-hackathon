@@ -5,6 +5,7 @@ import {
   createStampDutyPayment,
   isStampDutyComplete,
   isValidLandlordPercentage,
+  prepareStampDutyStep,
   recordStampDutyPayment,
 } from './stampDuty'
 
@@ -56,5 +57,15 @@ describe('stamp-duty payments', () => {
     expect(() => recordStampDutyPayment(agreement, 'landlord')).toThrow(/no contribution/i)
     const complete = recordStampDutyPayment(agreement, 'tenant')
     expect(isStampDutyComplete(complete)).toBe(true)
+  })
+
+  it('marks a configured zero amount complete without a payment', () => {
+    const agreement = createInitialAgreementState()
+    agreement.requirements.stampDutyAmount = 0
+    const prepared = prepareStampDutyStep(agreement)
+
+    expect(prepared.stampCompleted).toBe(true)
+    expect(prepared.stampDutyPayment?.landlord.status).toBe('not-required')
+    expect(prepared.stampDutyPayment?.tenant.status).toBe('not-required')
   })
 })

@@ -208,12 +208,8 @@ export function generateAgreement(
 ): GeneratedAgreement {
   const clauses: Clause[] = []
   const add = (id: string, title: string, text: string) => clauses.push({ id, title, text, status: 'unchanged' })
-  const parkingDescription = configuration.parking.enabled
-    ? ` Parking for ${configuration.parking.type === 'both' ? 'a car and a two-wheeler' : `a ${configuration.parking.type}`} is included${configuration.parking.identifier.trim() ? ` at ${configuration.parking.identifier.trim()}` : ''}.`
-    : ''
-
   add('parties', 'Parties', `${agreement.landlord.name || 'The landlord'} (“Landlord”) and ${agreement.tenant.name || 'the tenant'} (“Tenant”) agree to the terms below.`)
-  add('premises', 'Premises', `The Landlord provides the residential premises at ${agreement.property.address || 'the agreed property address'}, ${agreement.property.city}, ${agreement.property.state} to the Tenant.${parkingDescription}`)
+  add('premises', 'Premises', `The Landlord provides the residential premises at ${agreement.property.address || 'the agreed property address'}, ${agreement.property.city}, ${agreement.property.state} to the Tenant.`)
   add('term', 'Term', `The tenancy begins on ${formatDate(agreement.startDate)} and continues for ${agreement.durationMonths} months.`)
   add('monthly-rent', 'Monthly Rent', `The Tenant will pay monthly rent of ${inr(agreement.monthlyRent)} on or before day ${configuration.rent.dueDay} of each month by ${list(configuration.rent.paymentModes) || 'a payment method agreed by both parties'}.`)
 

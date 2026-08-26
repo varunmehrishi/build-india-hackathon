@@ -12,6 +12,7 @@ interface StampDutyScreenProps {
   activeRole?: PartyRole
   onConfigure: (landlordPercentage: number) => void
   onPay: () => Promise<void>
+  onOpenOtherParty?: () => void
 }
 
 const roleLabels: Record<PartyRole, string> = { landlord: 'Landlord', tenant: 'Tenant' }
@@ -41,6 +42,7 @@ export function StampDutyScreen({
   activeRole,
   onConfigure,
   onPay,
+  onOpenOtherParty,
 }: StampDutyScreenProps) {
   const payment = stampDutyPaymentFor(agreement)
   const [customPercentage, setCustomPercentage] = useState(String(payment.landlord.percentage))
@@ -77,6 +79,25 @@ export function StampDutyScreen({
     } finally {
       setProcessing(false)
     }
+  }
+
+  if (agreement.requirements.stampDutyAmount === 0) {
+    return (
+      <div className="stamp-content">
+        <Card className="stamp-card">
+          <div className="stamp-heading">
+            <div><p className="eyebrow">Execution step</p><h1>Stamp duty</h1><p className="lede">No stamp-duty payment is configured for this demo agreement.</p></div>
+            <Badge tone="neutral">Not required</Badge>
+          </div>
+          <div className="stamp-overview">
+            <span><small>Document</small><strong>{documentName}</strong></span>
+            <span><small>Property state</small><strong>{agreement.property.state}</strong></span>
+            <span><small>Configured amount</small><strong>₹0</strong></span>
+          </div>
+          <p className="stamp-disclaimer">This status applies only to the configured hackathon demo scenario and is not a statutory assessment.</p>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -147,7 +168,7 @@ export function StampDutyScreen({
                   {isCurrentParty && item.status === 'pending' ? (
                     <Button onClick={() => void pay()} disabled={processing}>{processing ? 'Processing…' : `Pay ₹${item.amount.toLocaleString('en-IN')}`}</Button>
                   ) : !isCurrentParty && item.status === 'pending' ? (
-                    <p className="party-message">Awaiting the {roleLabels[role].toLowerCase()} on their device.</p>
+                    <div><p className="party-message">Awaiting the {roleLabels[role].toLowerCase()}.</p>{onOpenOtherParty ? <Button variant="ghost" onClick={onOpenOtherParty}>View as {roleLabels[role]}</Button> : null}</div>
                   ) : item.status === 'not-required' ? (
                     <p className="party-message">No payment is required from this party.</p>
                   ) : (

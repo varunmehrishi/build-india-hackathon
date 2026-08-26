@@ -228,6 +228,7 @@ export function importSnapshot(
   snapshot: WorkflowSnapshotEnvelope,
 ): LocalWorkspace {
   const existing = workspace.documents[snapshot.agreement.agreementId]
+  if (existing && snapshot.agreement.snapshotRevision < existing.agreement.snapshotRevision) return workspace
   const role = snapshot.invitedRole ?? existing?.localRole
   const fallbackName = suggestDocumentName(snapshot.agreement.landlord.name, snapshot.agreement.tenant.name)
   const documentName = snapshot.documentName?.trim() || fallbackName
@@ -249,6 +250,16 @@ export function importSnapshot(
     activeDocumentId: snapshot.agreement.agreementId,
     documents: { ...workspace.documents, [snapshot.agreement.agreementId]: document },
   }
+}
+
+export function snapshotImportStatus(
+  workspace: LocalWorkspace,
+  snapshot: WorkflowSnapshotEnvelope,
+): 'accepted' | 'older-than-local' {
+  const existing = workspace.documents[snapshot.agreement.agreementId]
+  return existing && snapshot.agreement.snapshotRevision < existing.agreement.snapshotRevision
+    ? 'older-than-local'
+    : 'accepted'
 }
 
 export function documentLabel(document: StoredDocument): string {
