@@ -11,7 +11,6 @@ interface IdentityVerificationScreenProps {
   agreement: AgreementState
   viewingRole: PartyRole
   onVerify: (role: PartyRole, result: AadhaarVerificationResult) => boolean
-  onOpenOtherParty?: () => void
   lockDemoIdentity?: boolean
 }
 
@@ -23,7 +22,6 @@ export function IdentityVerificationScreen({
   agreement,
   viewingRole,
   onVerify,
-  onOpenOtherParty,
   lockDemoIdentity = false,
 }: IdentityVerificationScreenProps) {
   const [verifyingRole, setVerifyingRole] = useState<PartyRole | null>(null)
@@ -41,7 +39,6 @@ export function IdentityVerificationScreen({
           <div className="review-role-control identity-role-control">
             <small>Viewing as</small>
             <strong>{agreement[viewingRole].name} — {roleLabel(viewingRole)}</strong>
-            {onOpenOtherParty ? <Button variant="ghost" onClick={onOpenOtherParty}>View as {roleLabel(viewingRole === 'landlord' ? 'tenant' : 'landlord')}</Button> : null}
           </div>
         </header>
 
@@ -70,7 +67,7 @@ export function IdentityVerificationScreen({
                 ) : isViewing ? (
                   <Button onClick={() => setVerifyingRole(role)}>Verify Identity</Button>
                 ) : (
-                  onOpenOtherParty ? <Button variant="ghost" onClick={onOpenOtherParty}>View as {roleLabel(role)} to verify</Button> : <p className="party-message">Complete this identity check in that party’s demo view.</p>
+                  <p className="party-message">Complete this identity check in that party’s demo view.</p>
                 )}
               </section>
             )

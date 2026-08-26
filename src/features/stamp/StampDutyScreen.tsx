@@ -12,7 +12,6 @@ interface StampDutyScreenProps {
   activeRole?: PartyRole
   onConfigure: (landlordPercentage: number) => void
   onPay: () => Promise<void>
-  onOpenOtherParty?: () => void
 }
 
 const roleLabels: Record<PartyRole, string> = { landlord: 'Landlord', tenant: 'Tenant' }
@@ -42,7 +41,6 @@ export function StampDutyScreen({
   activeRole,
   onConfigure,
   onPay,
-  onOpenOtherParty,
 }: StampDutyScreenProps) {
   const payment = stampDutyPaymentFor(agreement)
   const [customPercentage, setCustomPercentage] = useState(String(payment.landlord.percentage))
@@ -168,7 +166,7 @@ export function StampDutyScreen({
                   {isCurrentParty && item.status === 'pending' ? (
                     <Button onClick={() => void pay()} disabled={processing}>{processing ? 'Processing…' : `Pay ₹${item.amount.toLocaleString('en-IN')}`}</Button>
                   ) : !isCurrentParty && item.status === 'pending' ? (
-                    <div><p className="party-message">Awaiting the {roleLabels[role].toLowerCase()}.</p>{onOpenOtherParty ? <Button variant="ghost" onClick={onOpenOtherParty}>View as {roleLabels[role]}</Button> : null}</div>
+                    <p className="party-message">Awaiting the {roleLabels[role].toLowerCase()} in their demo view.</p>
                   ) : item.status === 'not-required' ? (
                     <p className="party-message">No payment is required from this party.</p>
                   ) : (

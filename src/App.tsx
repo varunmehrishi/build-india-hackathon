@@ -148,6 +148,10 @@ function App() {
     ?? activeRole
     ?? state.initiator
   const signingRole = activeRole ?? state.signingRole ?? state.identityVerificationRole ?? state.initiator
+  const otherPartyRole = activeRole === 'landlord' ? 'tenant' : 'landlord'
+  const showOtherPartyLauncher = Boolean(
+    authSession && activeRole && !collaboration && ['review', 'stamp', 'identity', 'sign'].includes(state.workflowStep),
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -768,10 +772,16 @@ function App() {
     url.searchParams.set('partyDemo', '1')
     url.searchParams.set('partyRole', invitedRole)
     url.searchParams.set('returnRole', activeRole)
+    const availableWidth = window.screen.availWidth || window.innerWidth
+    const availableHeight = window.screen.availHeight || window.innerHeight
+    const popupWidth = Math.min(960, Math.max(360, availableWidth - 80))
+    const popupHeight = Math.min(780, Math.max(560, availableHeight - 80))
+    const popupLeft = Math.max(0, window.screenX + ((window.outerWidth || availableWidth) - popupWidth) / 2)
+    const popupTop = Math.max(0, window.screenY + ((window.outerHeight || availableHeight) - popupHeight) / 2)
     const popup = window.open(
       url.toString(),
       'saral-setu-party-demo',
-      'popup=yes,width=1120,height=820,resizable=yes,scrollbars=yes',
+      `popup=yes,width=${Math.round(popupWidth)},height=${Math.round(popupHeight)},left=${Math.round(popupLeft)},top=${Math.round(popupTop)},resizable=yes,scrollbars=yes`,
     )
     if (!popup) {
       setNotice('The browser blocked the other-party window. Allow popups for this demo and try again.')
@@ -854,6 +864,16 @@ function App() {
             </aside>
 
             <main className="content" id="main-content">
+              {showOtherPartyLauncher ? (
+                <section className="party-demo-launcher" aria-label="Other party demo">
+                  <div>
+                    <p className="eyebrow">Two-party demo</p>
+                    <strong>Need an action from {state[otherPartyRole].name}?</strong>
+                    <span>Open their isolated demo view, complete the action, and send the update back here.</span>
+                  </div>
+                  <Button variant="secondary" onClick={openOtherParty}>View as {state[otherPartyRole].name}</Button>
+                </section>
+              ) : null}
               {state.workflowStep === 'finalized' ? (
                 <FinalizedView agreement={state} localRole={activeRole} />
               ) : state.workflowStep === 'stamp' ? (
@@ -863,14 +883,12 @@ function App() {
                   activeRole={activeRole}
                   onConfigure={configureStampDuty}
                   onPay={payStampDuty}
-                  onOpenOtherParty={collaboration ? undefined : openOtherParty}
                 />
               ) : state.workflowStep === 'identity' ? (
                 <IdentityVerificationScreen
                   agreement={state}
                   viewingRole={identityViewingRole}
                   onVerify={verifyIdentity}
-                  onOpenOtherParty={collaboration ? undefined : openOtherParty}
                   lockDemoIdentity={Boolean(collaboration)}
                 />
               ) : state.workflowStep === 'notary' ? (
@@ -896,7 +914,7 @@ function App() {
               ) : state.workflowStep === 'agreement' ? (
                 <AgreementBuilder agreement={state} onChange={updateAgreementBuilder} />
               ) : state.workflowStep === 'review' ? (
-                <AgreementReview agreement={state} viewingRole={activeRole ?? state.initiator} onChange={updateAgreementReview} onFinalize={finalizeDocument} onOpenOtherParty={collaboration ? undefined : openOtherParty} />
+                <AgreementReview agreement={state} viewingRole={activeRole ?? state.initiator} onChange={updateAgreementReview} onFinalize={finalizeDocument} />
               ) : (
                 <Card className="stage-card">
                   <div className="section-heading"><p className="eyebrow">{activeStep.kicker}</p><h1>{activeStep.title}</h1></div>

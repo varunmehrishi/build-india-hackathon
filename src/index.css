@@ -113,6 +113,22 @@ button { color: inherit; }
 .party-demo-banner > span { display: grid; gap: 4px; }
 .party-demo-banner small { color: #806638; }
 
+.party-demo-launcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid #bfded5;
+  border-radius: 18px;
+  background: linear-gradient(110deg, #f1f8f5, #fffefb);
+  box-shadow: 0 10px 30px rgba(23, 47, 40, 0.06);
+}
+.party-demo-launcher > div { display: grid; gap: 4px; }
+.party-demo-launcher .eyebrow { margin-bottom: 1px; }
+.party-demo-launcher > div > span { color: var(--muted); font-size: .8rem; line-height: 1.45; }
+.party-demo-launcher > .btn { flex: 0 0 auto; }
+
 h1, h2, p { margin-top: 0; }
 h1, h2 { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.025em; }
 h1 { margin-bottom: 14px; font-size: clamp(2.3rem, 5vw, 4.7rem); line-height: 0.98; }
@@ -327,6 +343,7 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
 .review-role-control label { color: var(--muted); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .review-role-control > small { color: var(--muted); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .review-role-control > strong { font-size: .84rem; }
+.review-role-control > span { color: var(--muted); font-size: .72rem; line-height: 1.4; }
 .review-role-control > .btn { justify-self: start; margin-top: 3px; min-height: 36px; padding: 7px 12px; font-size: .75rem; }
 .review-role-control select { width: 100%; border: 0; background: transparent; color: var(--text); font-weight: 750; outline: 0; }
 .review-status-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid var(--border); border-radius: 16px; background: var(--cream); }
@@ -690,6 +707,8 @@ button.workflow-card:hover { transform: translateY(-2px); border-color: #82afa3;
   .site-header { align-items: flex-start; }
   .party-demo-banner { align-items: stretch; flex-direction: column; }
   .party-demo-banner .btn { width: 100%; }
+  .party-demo-launcher { align-items: stretch; flex-direction: column; }
+  .party-demo-launcher > .btn { width: 100%; }
   .brand-logo { width: 76px; height: 76px; }
   .header-actions .badge, .citizen-name { display: none; }
   .header-actions .btn { min-height: 38px; padding: 8px 11px; font-size: .76rem; }

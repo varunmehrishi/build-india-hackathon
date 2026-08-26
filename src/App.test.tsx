@@ -52,9 +52,13 @@ async function applyOtherPartyUpdate(
 ) {
   const popup = { closed: false, focus: vi.fn() } as unknown as Window
   const open = vi.spyOn(window, 'open').mockReturnValue(popup)
-  const buttons = screen.getAllByRole('button', { name: /View as Landlord/ })
+  const buttons = screen.getAllByRole('button', { name: 'View as Arjun Rao' })
   await user.click(buttons[0])
-  expect(open).toHaveBeenCalledWith(expect.stringContaining('partyDemo=1'), 'saral-setu-party-demo', expect.any(String))
+  expect(open).toHaveBeenCalledWith(
+    expect.stringContaining('partyDemo=1'),
+    'saral-setu-party-demo',
+    expect.stringContaining('popup=yes'),
+  )
 
   const currentWorkspace = loadWorkspace()
   const currentDocument = currentWorkspace.documents[currentWorkspace.activeDocumentId]
@@ -296,9 +300,11 @@ describe('persistent multi-document journey', () => {
     await finalizeDocument(firstUser)
     await firstUser.click(screen.getByRole('button', { name: 'Continue' }))
     await screen.findByRole('heading', { name: 'Stamp duty' })
+    expect(screen.getByRole('button', { name: 'View as Arjun Rao' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
     await firstUser.click(screen.getByRole('button', { name: 'Pay ₹900' }))
     expect(await screen.findByText('Contribution received.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View as Arjun Rao' })).toBeInTheDocument()
     expect(screen.getByText(/share the document with the landlord/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
     await firstUser.click(screen.getByRole('button', { name: 'Share' }))

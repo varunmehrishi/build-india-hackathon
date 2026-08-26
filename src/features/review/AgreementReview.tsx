@@ -20,7 +20,6 @@ interface AgreementReviewProps {
   viewingRole: PartyRole
   onChange: (agreement: AgreementState) => void
   onFinalize: () => void
-  onOpenOtherParty?: () => void
 }
 
 function roleLabel(role: PartyRole): string {
@@ -45,7 +44,7 @@ function ProposalDiff({ proposal }: { proposal: ProposedChange }) {
   )
 }
 
-export function AgreementReview({ agreement, viewingRole, onChange, onFinalize, onOpenOtherParty }: AgreementReviewProps) {
+export function AgreementReview({ agreement, viewingRole, onChange, onFinalize }: AgreementReviewProps) {
   const review = { ...resolveReviewState(agreement), currentRole: viewingRole }
   const viewingAgreement = { ...agreement, review }
   const selectedClause = agreement.clauses.find((clause) => clause.id === review.selectedClauseId) ?? agreement.clauses[0]
@@ -95,9 +94,9 @@ export function AgreementReview({ agreement, viewingRole, onChange, onFinalize, 
           <p className="lede">Read each clause, ask a plain-language question, and agree on one final version before execution.</p>
         </div>
         <div className="review-role-control">
-          <small>Viewing as</small>
+          <small>Current party</small>
           <strong>{agreement[currentRole].name} — {roleLabel(currentRole)}</strong>
-          {onOpenOtherParty ? <Button variant="ghost" onClick={onOpenOtherParty}>View as {roleLabel(otherRole(currentRole))}</Button> : null}
+          <span>Actions on this screen are recorded for this party only.</span>
         </div>
       </header>
 
