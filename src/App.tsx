@@ -57,6 +57,7 @@ import { AuthGate } from './features/auth/AuthGate'
 import type { AadhaarVerificationResult } from './features/auth/AadhaarOtpDialog'
 import { AgreementBuilder } from './features/agreement/AgreementBuilder'
 import { ProfileMenu } from './features/auth/ProfileMenu'
+import { CompletionPage } from './features/completion/CompletionPage'
 import { FinalizedView } from './features/finalized/FinalizedView'
 import { DetailsScreen } from './features/intake/DetailsScreen'
 import { IntentScreen } from './features/intake/IntentScreen'
@@ -826,7 +827,7 @@ function App() {
             ) : null}
             {authSession && !collaboration ? <Button variant="ghost" onClick={createDocument}>New document</Button> : null}
             {authSession && activeRole ? <Badge tone="success">You’re the {activeRole}</Badge> : null}
-            {state.finalized && authSession && activeRole && !collaboration ? <Button variant="ghost" onClick={openShare}>Share</Button> : null}
+            {state.finalized && state.workflowStep !== 'complete' && authSession && activeRole && !collaboration ? <Button variant="ghost" onClick={openShare}>Share</Button> : null}
             {!collaboration ? <Button variant="ghost" onClick={resetWorkflow}>Reset Demo</Button> : null}
             {authSession ? <ProfileMenu name={authSession.displayName} onSave={updateProfileName} editable={activeIndex < reviewStepIndex} /> : null}
             {authSession ? <Button variant="secondary" onClick={() => void logout()}>Logout</Button> : null}
@@ -909,6 +910,12 @@ function App() {
                   onContinue={continueFromSigning}
                   onOpenOtherParty={collaboration ? undefined : openOtherParty}
                 />
+              ) : state.workflowStep === 'complete' ? (
+                <CompletionPage
+                  agreement={state}
+                  onCreateAnother={createDocument}
+                  getShareUrl={() => createSnapshotUrl(snapshotFor(document))}
+                />
               ) : state.workflowStep === 'requirements' ? (
                 <RequirementsScreen agreement={state} />
               ) : state.workflowStep === 'agreement' ? (
@@ -929,7 +936,7 @@ function App() {
                   </div>
                 </Card>
               )}
-              {state.workflowStep === 'notary' || state.workflowStep === 'sign' ? null : <div className="journey-actions">
+              {state.workflowStep === 'notary' || state.workflowStep === 'sign' || state.workflowStep === 'complete' ? null : <div className="journey-actions">
                 <Button variant="ghost" onClick={() => moveStep(-1)} disabled={state.workflowStep === 'finalized'}>Back</Button>
                 {state.workflowStep === 'review' ? null : state.workflowStep === 'agreement' ? (
                   <Button onClick={continueFromAgreement}>Continue to Review</Button>
@@ -937,7 +944,6 @@ function App() {
                   <Button
                     onClick={() => moveStep(1)}
                     disabled={
-                      state.workflowStep === 'complete' ||
                       (state.workflowStep === 'stamp' && !state.stampCompleted) ||
                       (state.workflowStep === 'identity' && !areBothPartiesVerified(state))
                     }

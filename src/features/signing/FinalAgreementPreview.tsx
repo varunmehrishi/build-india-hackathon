@@ -1,5 +1,8 @@
+import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
+import { resolveNotarizationStatus } from '../../domain/notarization'
+import { stampDutyPaymentFor } from '../../domain/stampDuty'
 import type { AgreementState, PartyRole, SignatureRecord } from '../../domain/types'
 import { finalAgreementInventory, finalAgreementVersion, signatureMatchesFinalAgreement } from '../../domain/signing'
 
@@ -44,6 +47,8 @@ function SignatureBlock({ agreement, role, signature }: {
 export function FinalAgreementPreview({ agreement, onClose }: FinalAgreementPreviewProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const inventory = finalAgreementInventory(agreement)
+  const stampPayment = stampDutyPaymentFor(agreement)
+  const notarizationStatus = resolveNotarizationStatus(agreement)
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null
@@ -51,7 +56,7 @@ export function FinalAgreementPreview({ agreement, onClose }: FinalAgreementPrev
     return () => previousFocus?.focus()
   }, [])
 
-  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
       event.preventDefault()
       onClose()
@@ -100,6 +105,14 @@ export function FinalAgreementPreview({ agreement, onClose }: FinalAgreementPrev
               </tbody></table></div>
             </section>
           ) : null}
+          <section className="esign-execution-evidence">
+            <h2>Execution record</h2>
+            <div className="esign-evidence-grid">
+              <div><small>Demo stamp duty</small><strong>{agreement.requirements.stampDutyAmount === 0 ? 'Not required' : agreement.stampCompleted ? `₹${agreement.requirements.stampDutyAmount.toLocaleString('en-IN')} completed ✓` : 'Incomplete'}</strong>{(['landlord', 'tenant'] as const).map((role) => stampPayment[role].paymentReference ? <span key={role}>{agreement[role].name}: {stampPayment[role].paymentReference}</span> : null)}</div>
+              <div><small>Notarial attestation</small><strong>{notarizationStatus === 'completed' ? 'Completed ✓' : 'Not selected'}</strong>{notarizationStatus === 'completed' ? <span>{agreement.notaryDisplayName} · {agreement.notaryRegistrationId}</span> : null}</div>
+              <div><small>Saral Setu document ID</small><strong>{agreement.documentId ?? 'Preparing…'}</strong><span>Version {finalAgreementVersion(agreement)}</span></div>
+            </div>
+          </section>
           <section className="esign-signatures-section">
             <h2>Signatures</h2>
             <div className="esign-signature-grid">
@@ -113,4 +126,3 @@ export function FinalAgreementPreview({ agreement, onClose }: FinalAgreementPrev
     </div>
   )
 }
-import { useEffect, useRef } from 'react'

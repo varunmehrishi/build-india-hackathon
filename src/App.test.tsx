@@ -454,10 +454,54 @@ describe('persistent multi-document journey', () => {
     expect(signed.signingEvents?.at(-1)?.type).toBe('all-signatures-completed')
 
     await user.click(screen.getByRole('button', { name: 'Continue' }))
-    expect(await screen.findByRole('heading', { name: 'Completion' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(await screen.findByRole('heading', { name: 'All signatures complete' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your rent agreement is complete' })).toBeInTheDocument()
+    expect(screen.getByText(signed.documentId!)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download Agreement' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Email Agreement' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
+
+    const copyCompletionLink = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined)
+    await user.click(screen.getByRole('button', { name: 'Share' }))
+    await waitFor(() => expect(copyCompletionLink).toHaveBeenCalledWith(expect.stringContaining('#share=')))
+    expect(screen.getAllByText('Signed agreement link copied.')).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: 'View Agreement' }))
+    const completedPreview = await screen.findByRole('dialog', { name: 'Residential Rent Agreement' })
+    expect(within(completedPreview).getAllByText('Digitally signed ✓')).toHaveLength(2)
+    expect(within(completedPreview).getByText('Execution record')).toBeInTheDocument()
+    await user.click(within(completedPreview).getByRole('button', { name: 'Close final agreement' }))
+
+    await user.click(screen.getByRole('button', { name: 'Email Agreement' }))
+    const emailDialog = await screen.findByRole('dialog', { name: 'Email signed agreement' })
+    expect(within(emailDialog).getByText('meera@example.com')).toBeInTheDocument()
+    expect(within(emailDialog).getByText('arjun@example.com')).toBeInTheDocument()
+    await user.click(within(emailDialog).getByRole('button', { name: 'Send Agreement' }))
+    expect(await within(emailDialog).findByRole('status')).toHaveTextContent('No real email was sent')
+    await user.click(within(emailDialog).getByRole('button', { name: 'Done' }))
+
+    await user.click(screen.getByRole('button', { name: 'Verify Document' }))
+    const integrityDialog = await screen.findByRole('dialog', { name: 'Document integrity' })
+    expect(within(integrityDialog).getByText('Current document matches signed copy')).toBeInTheDocument()
+    await user.click(within(integrityDialog).getByRole('button', { name: 'Close Document integrity' }))
+
+    const executionRecordCard = screen.getByRole('heading', { name: 'Execution Record' }).closest('section')!
+    await user.click(within(executionRecordCard).getByRole('button', { name: 'View' }))
+    const executionRecordDialog = await screen.findByRole('dialog', { name: 'Execution Record' })
+    expect(within(executionRecordDialog).getByText(signed.finalDocumentHash!)).toBeInTheDocument()
+    expect(within(executionRecordDialog).getByText('All required signatures completed')).toBeInTheDocument()
+    await user.click(within(executionRecordDialog).getByRole('button', { name: 'Close Execution Record' }))
+
+    await user.click(screen.getByRole('button', { name: 'View Audit Trail' }))
+    const auditDialog = await screen.findByRole('dialog', { name: 'Audit Trail' })
+    expect(within(auditDialog).getByText('All required signatures completed')).toBeInTheDocument()
+    await user.click(within(auditDialog).getByRole('button', { name: 'Close Audit Trail' }))
+
+    const completedId = loadWorkspace().activeDocumentId
+    await user.click(screen.getByRole('button', { name: 'Create another document' }))
+    expect(await screen.findByRole('heading', { name: 'What do you need to get done?' })).toBeInTheDocument()
+    const afterCreate = loadWorkspace()
+    expect(Object.keys(afterCreate.documents)).toHaveLength(2)
+    expect(afterCreate.documents[completedId].agreement.workflowStep).toBe('complete')
   })
 
   it('logout preserves documents and the next login restores the active finalized view', async () => {
