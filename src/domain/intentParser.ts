@@ -58,6 +58,8 @@ export const cityAliases = [
 ] as const
 
 const agreementMisspellings = /\b(?:agriment|agrement|aggrement|aggreement|agreeement)\b/g
+const MAX_TENANCY_MONTHS = 60
+const MIN_CONTEXTUAL_MONEY_AMOUNT = 1_000
 
 export function normalizeText(input: string): string {
   return input
@@ -125,14 +127,15 @@ export function extractLocation(text: string): Pick<ParsedIntent, 'city' | 'stat
 
 export function extractDuration(text: string): ParsedField<number> | undefined {
   const normalized = normalizeText(text)
-  const pattern = /\b(\d{1,3})\s*(years?|yrs?|months?|mos?|mahine|mahina)\b/g
+  // Do not read a trailing group from currency, decimal, comma-formatted, negative, or longer numbers.
+  const pattern = /(?<![-\d,₹.])\b(\d{1,3})\s*(years?|yrs?|months?|mos?|mahine|mahina)\b/g
   const matches = [...normalized.matchAll(pattern)]
     .map((match) => {
       const count = Number(match[1])
       const years = /^(?:year|yr)/.test(match[2])
       return { source: match[0], months: years ? count * 12 : count }
     })
-    .filter(({ months }) => Number.isInteger(months) && months >= 1 && months <= 60)
+    .filter(({ months }) => Number.isInteger(months) && months >= 1 && months <= MAX_TENANCY_MONTHS)
   if (matches.length !== 1) return undefined
   return field(matches[0].months, 0.96, matches[0].source)
 }
@@ -159,7 +162,7 @@ export function extractMoneyMentions(text: string): MoneyMention[] {
   return [...normalized.matchAll(pattern)].flatMap((match) => {
     const source = match[0].trim()
     const value = parseIndianMoney(source)
-    if (value === null || (value < 1_000 && !source.includes('₹'))) return []
+    if (value === null || (value < MIN_CONTEXTUAL_MONEY_AMOUNT && !source.includes('₹'))) return []
     const start = match.index ?? 0
     return [{ value, source, start, end: start + match[0].length }]
   })
@@ -174,7 +177,7 @@ interface ContextMatch {
 
 function moneyContexts(text: string): ContextMatch[] {
   const definitions = {
-    rent: ['monthly rent', 'per month', '/month', 'a month', 'rent', 'kiraya', 'pm'],
+    rent: ['monthly rent', 'per month', '/month', 'a month', 'rent', 'kiraya', 'mahina', 'mahine', 'pm'],
     deposit: ['refundable deposit', 'security deposit', 'deposit', 'advance', 'security', 'jama'],
   } as const
   return (Object.entries(definitions) as Array<[ContextMatch['kind'], readonly string[]]>).flatMap(([kind, phrases]) =>
@@ -220,7 +223,8 @@ export function associateMoneyWithContext(
       if (mentions.some((other) => other !== mention && contextDistance(context, other) < distance)) return []
       const confidence = Math.max(0.68, (before ? 0.94 : 0.9) - distance * 0.01)
       return [{ context, confidence, distance }]
-    }).sort((a, b) => b.confidence - a.confidence || a.distance - b.distance)
+    }).filter(({ context }) => !assignments.some((assignment) => assignment.kind === context.kind))
+      .sort((a, b) => b.confidence - a.confidence || a.distance - b.distance)
 
     if (!nearby.length) continue
     const best = nearby[0]

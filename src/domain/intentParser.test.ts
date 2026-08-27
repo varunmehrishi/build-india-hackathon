@@ -93,6 +93,10 @@ describe('extractDuration', () => {
     expect(extractDuration('Need a rent agreement')).toBeUndefined()
     expect(extractDuration('0 months')).toBeUndefined()
     expect(extractDuration('11 months or 1 year')).toBeUndefined()
+    expect(extractDuration('61 mahina')).toBeUndefined()
+    expect(extractDuration('40000 mahina')).toBeUndefined()
+    expect(extractDuration('₹11 mahina')).toBeUndefined()
+    expect(extractDuration('-11 mahina')).toBeUndefined()
   })
 })
 
@@ -181,11 +185,21 @@ describe('money association', () => {
       securityDeposit: { value: 200_000 },
     })
     expect(associateMoneyWithContext('rent is ₹40,000 pm')).toMatchObject({ monthlyRent: { value: 40_000 } })
+    expect(associateMoneyWithContext('40000 mahina')).toMatchObject({ monthlyRent: { value: 40_000 } })
+    expect(associateMoneyWithContext('mahine ka 40k')).toMatchObject({ monthlyRent: { value: 40_000 } })
+    expect(associateMoneyWithContext('1000 mahina')).toMatchObject({ monthlyRent: { value: 1_000 } })
+    expect(associateMoneyWithContext('120000 jama')).toMatchObject({ securityDeposit: { value: 120_000 } })
+    expect(associateMoneyWithContext('security 1.2 lakh')).toMatchObject({ securityDeposit: { value: 120_000 } })
   })
 
   it('does not assign ambiguous or unlabelled amounts', () => {
     expect(associateMoneyWithContext('rent and deposit are 40k')).toEqual({})
     expect(associateMoneyWithContext('the amounts are 40k and 1 lakh')).toEqual({
+      monthlyRent: undefined,
+      securityDeposit: undefined,
+    })
+    expect(associateMoneyWithContext('61 mahina')).toEqual({ monthlyRent: undefined, securityDeposit: undefined })
+    expect(associateMoneyWithContext('the amount is 120000')).toEqual({
       monthlyRent: undefined,
       securityDeposit: undefined,
     })
@@ -238,6 +252,25 @@ describe('parseIntent', () => {
     expect(parseIntent('Bangalore mein 11 mahine ka rent agreement banana hai, rent 40k hai aur deposit 1.2 lakh.')).toMatchObject({
       workflow: { value: 'rent_agreement' }, city: { value: 'Bengaluru' }, durationMonths: { value: 11 },
       monthlyRent: { value: 40_000 }, securityDeposit: { value: 120_000 },
+    })
+  })
+
+  it('uses mahina as monthly-rent context rather than a duration', () => {
+    const parsed = parseIntent('Bangalore rent agreement, 40000 mahina and 1 lakh deposit.')
+    expect(parsed).toMatchObject({
+      workflow: { value: 'rent_agreement' },
+      monthlyRent: { value: 40_000 },
+      securityDeposit: { value: 100_000 },
+    })
+    expect(parsed.durationMonths).toBeUndefined()
+  })
+
+  it('separates duration, monthly rent, and deposit using number size and context', () => {
+    const parsed = parseIntent('Bangalore rent agreement for 11 mahina, 40000 mahina rent and 120000 jama.')
+    expect(parsed).toMatchObject({
+      durationMonths: { value: 11 },
+      monthlyRent: { value: 40_000 },
+      securityDeposit: { value: 120_000 },
     })
   })
 
