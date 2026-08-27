@@ -6,7 +6,9 @@ import {
   extractFurnishing,
   extractLocation,
   inferInitiator,
+  cityAliases,
   normalizeText,
+  normalizeIntentVocabulary,
   parseIndianMoney,
   parseIntent,
   prefillDraftFromParsedIntent,
@@ -17,6 +19,11 @@ describe('normalizeText', () => {
   it('normalizes case, whitespace, apostrophes, and dashes', () => {
     expect(normalizeText('  I’M after a SEMI–FURNISHED flat  ')).toBe("i'm after a semi-furnished flat")
   })
+
+  it.each(['agriment', 'agrement', 'aggrement', 'aggreement', 'agreeement'])(
+    'normalizes the common agreement misspelling %s',
+    (misspelling) => expect(normalizeIntentVocabulary(`rent ${misspelling}`)).toBe('rent agreement'),
+  )
 })
 
 describe('detectWorkflow', () => {
@@ -24,6 +31,15 @@ describe('detectWorkflow', () => {
     'recognizes the strong phrase %s',
     (phrase) => expect(detectWorkflow(`I need a ${phrase}`).value).toBe('rent_agreement'),
   )
+
+  it.each(['rent agriment', 'rental agrement', 'tenancy aggrement', 'lease agreeement'])(
+    'recognizes a common misspelling in %s',
+    (phrase) => expect(detectWorkflow(`I need a ${phrase}`).value).toBe('rent_agreement'),
+  )
+
+  it('uses slightly lower confidence when spelling correction was needed', () => {
+    expect(detectWorkflow('rent agriment')).toMatchObject({ value: 'rent_agreement', confidence: 0.92 })
+  })
 
   it.each(['Rental contract for my flat', 'I am a tenant', 'I want to rent out my property'])(
     'combines supporting evidence in %s',
@@ -81,6 +97,10 @@ describe('extractDuration', () => {
 })
 
 describe('extractLocation', () => {
+  it('keeps the major-city dictionary at 30 canonical cities', () => {
+    expect(cityAliases).toHaveLength(30)
+  })
+
   it.each([
     ['Bangalore', 'Bengaluru', 'Karnataka'],
     ['Hyderabad', 'Hyderabad', 'Telangana'],
@@ -94,6 +114,22 @@ describe('extractLocation', () => {
       city: { value: city },
       state: { value: state },
     })
+  })
+
+  it.each(cityAliases)(
+    'recognizes every alias configured for $city',
+    ({ city, state, aliases }) => {
+      for (const alias of aliases) {
+        expect(extractLocation(`A home in ${alias}`)).toMatchObject({
+          city: { value: city },
+          state: { value: state },
+        })
+      }
+    },
+  )
+
+  it('prefers the longest location alias', () => {
+    expect(extractLocation('A flat in New Delhi')).toMatchObject({ city: { value: 'Delhi', source: 'new delhi' } })
   })
 
   it('does not attempt generic location extraction', () => {

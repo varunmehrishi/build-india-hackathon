@@ -32,7 +32,32 @@ export const cityAliases = [
   { city: 'Pune', state: 'Maharashtra', aliases: ['pune'] },
   { city: 'Chennai', state: 'Tamil Nadu', aliases: ['chennai', 'madras'] },
   { city: 'Kolkata', state: 'West Bengal', aliases: ['kolkata', 'calcutta'] },
+  { city: 'Ahmedabad', state: 'Gujarat', aliases: ['ahmedabad', 'amdavad'] },
+  { city: 'Surat', state: 'Gujarat', aliases: ['surat'] },
+  { city: 'Jaipur', state: 'Rajasthan', aliases: ['jaipur'] },
+  { city: 'Lucknow', state: 'Uttar Pradesh', aliases: ['lucknow'] },
+  { city: 'Kanpur', state: 'Uttar Pradesh', aliases: ['kanpur'] },
+  { city: 'Nagpur', state: 'Maharashtra', aliases: ['nagpur'] },
+  { city: 'Indore', state: 'Madhya Pradesh', aliases: ['indore'] },
+  { city: 'Thane', state: 'Maharashtra', aliases: ['thane'] },
+  { city: 'Bhopal', state: 'Madhya Pradesh', aliases: ['bhopal'] },
+  { city: 'Visakhapatnam', state: 'Andhra Pradesh', aliases: ['visakhapatnam', 'vishakhapatnam', 'vizag'] },
+  { city: 'Pimpri-Chinchwad', state: 'Maharashtra', aliases: ['pimpri-chinchwad', 'pimpri chinchwad'] },
+  { city: 'Patna', state: 'Bihar', aliases: ['patna'] },
+  { city: 'Vadodara', state: 'Gujarat', aliases: ['vadodara', 'baroda'] },
+  { city: 'Ghaziabad', state: 'Uttar Pradesh', aliases: ['ghaziabad'] },
+  { city: 'Ludhiana', state: 'Punjab', aliases: ['ludhiana'] },
+  { city: 'Agra', state: 'Uttar Pradesh', aliases: ['agra'] },
+  { city: 'Nashik', state: 'Maharashtra', aliases: ['nashik', 'nasik'] },
+  { city: 'Faridabad', state: 'Haryana', aliases: ['faridabad'] },
+  { city: 'Meerut', state: 'Uttar Pradesh', aliases: ['meerut'] },
+  { city: 'Rajkot', state: 'Gujarat', aliases: ['rajkot'] },
+  { city: 'Kalyan-Dombivli', state: 'Maharashtra', aliases: ['kalyan-dombivli', 'kalyan dombivli', 'kalyan dombivali'] },
+  { city: 'Vasai-Virar', state: 'Maharashtra', aliases: ['vasai-virar', 'vasai virar'] },
+  { city: 'Varanasi', state: 'Uttar Pradesh', aliases: ['varanasi', 'banaras', 'benares'] },
 ] as const
+
+const agreementMisspellings = /\b(?:agriment|agrement|aggrement|aggreement|agreeement)\b/g
 
 export function normalizeText(input: string): string {
   return input
@@ -42,6 +67,10 @@ export function normalizeText(input: string): string {
     .replace(/[’‘]/g, "'")
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+export function normalizeIntentVocabulary(input: string): string {
+  return normalizeText(input).replace(agreementMisspellings, 'agreement')
 }
 
 function field<T>(value: T, confidence: number, source: string): ParsedField<T> {
@@ -60,11 +89,13 @@ function matchedPhrase(text: string, phrases: readonly string[]): string | undef
 }
 
 export function detectWorkflow(text: string): ParsedField<'rent_agreement' | 'unknown'> {
-  const normalized = normalizeText(text)
+  const rawNormalized = normalizeText(text)
+  const normalized = normalizeIntentVocabulary(rawNormalized)
+  const spellingCorrected = normalized !== rawNormalized
   const strong = matchedPhrase(normalized, [
     'rent agreement', 'rental agreement', 'tenancy agreement', 'lease agreement',
   ])
-  if (strong) return field('rent_agreement', 0.98, strong)
+  if (strong) return field('rent_agreement', spellingCorrected ? 0.92 : 0.98, spellingCorrected ? rawNormalized : strong)
 
   const weightedPhrases: ReadonlyArray<[string, number]> = [
     ['rent out', 3], ['lease out', 3], ['rent pe', 2], ['kiraya', 2],
