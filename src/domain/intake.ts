@@ -4,6 +4,7 @@ import type {
   IntakeErrors,
   PropertyType,
 } from './types'
+import { detectWorkflow } from './intentParser'
 
 export const indianStatesAndTerritories = [
   'Andaman and Nicobar Islands',
@@ -87,11 +88,8 @@ export function suggestDocumentName(landlordName: string, tenantName: string): s
   return landlord && tenant ? `${landlord} & ${tenant}` : 'New rent agreement'
 }
 
-const rentIntentPattern = /\b(rent|rental|lease|tenancy|landlord|tenant)\b/i
-
 export function classifyIntent(input: string): 'rent-agreement' | 'unsupported' {
-  const normalized = input.trim().toLocaleLowerCase('en-IN')
-  return rentIntentPattern.test(normalized) ? 'rent-agreement' : 'unsupported'
+  return detectWorkflow(input).value === 'rent_agreement' ? 'rent-agreement' : 'unsupported'
 }
 
 function isValidIsoDate(value: string): boolean {

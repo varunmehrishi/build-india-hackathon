@@ -13,8 +13,9 @@ import {
   type DemoAuthSession,
 } from './domain/auth'
 import { workflowStepOrder, workflowSteps } from './domain/demoData'
-import { generateAgreement, resolveAgreementBuilderConfiguration } from './domain/agreementBuilder'
+import { createDefaultAgreementBuilderConfiguration, generateAgreement, resolveAgreementBuilderConfiguration } from './domain/agreementBuilder'
 import { applyIntakeDraft, suggestDocumentName } from './domain/intake'
+import { appFurnishingLevel, parseIntent, prefillDraftFromParsedIntent } from './domain/intentParser'
 import {
   areBothPartiesVerified,
   clearExecutionVerification,
@@ -387,11 +388,39 @@ function App() {
   }
 
   function beginRentWorkflow(intentText: string) {
-    mutateActiveDocument((current) => ({
-      ...current,
-      furthestStepIndex: Math.max(current.furthestStepIndex, 1),
-      agreement: { ...current.agreement, intentText, workflowStep: 'details' },
-    }))
+    const parsed = parseIntent(intentText)
+    mutateActiveDocument((current) => {
+      let nextDraft = prefillDraftFromParsedIntent(current.intakeDraft, parsed)
+      const parsedRole = parsed.initiator?.value
+      if (parsedRole && authSession) {
+        const nameField = parsedRole === 'landlord' ? 'landlordName' : 'tenantName'
+        if (!nextDraft[nameField]) nextDraft = { ...nextDraft, [nameField]: authSession.displayName }
+      }
+      if (!current.documentNameCustomized) {
+        nextDraft = {
+          ...nextDraft,
+          documentName: suggestDocumentName(nextDraft.landlordName, nextDraft.tenantName),
+        }
+      }
+      const furnishingLevel = appFurnishingLevel(parsed)
+      const configuration = furnishingLevel
+        ? current.agreement.agreementBuilder ?? createDefaultAgreementBuilderConfiguration()
+        : current.agreement.agreementBuilder
+      return {
+        ...current,
+        intakeDraft: nextDraft,
+        localRole: parsedRole ?? current.localRole,
+        furthestStepIndex: Math.max(current.furthestStepIndex, 1),
+        agreement: {
+          ...current.agreement,
+          intentText,
+          workflowStep: 'details',
+          agreementBuilder: configuration && furnishingLevel
+            ? { ...configuration, furnishing: { ...configuration.furnishing, level: furnishingLevel } }
+            : configuration,
+        },
+      }
+    })
   }
 
   function updateProfileName(displayName: string) {

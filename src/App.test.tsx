@@ -154,6 +154,27 @@ describe('persistent multi-document journey', () => {
     expect(screen.getByText('You’re the tenant')).toBeInTheDocument()
   })
 
+  it('prefills guided details from a deterministic natural-language request', async () => {
+    render(<App />)
+    const user = await login()
+    const intent = screen.getByRole('textbox', { name: 'Describe what you need' })
+    await user.type(intent, 'I am a tenant who needs an 11 month fully furnished rental agreement in Hyderabad, paying 45,000 rent and 2 lakh deposit.')
+    await user.click(screen.getByRole('button', { name: 'Find my workflow' }))
+
+    expect(await screen.findByRole('heading', { name: 'Tell us about the tenancy' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Tenant')).toBeChecked()
+    expect(screen.getByLabelText('State or union territory')).toHaveValue('Telangana')
+    expect(screen.getByLabelText('City')).toHaveValue('Hyderabad')
+    expect(screen.getByLabelText('Duration (months)')).toHaveValue('11')
+    expect(screen.getByLabelText('Monthly rent (₹)')).toHaveValue('45000')
+    expect(screen.getByLabelText('Security deposit (₹)')).toHaveValue('200000')
+    expect(screen.getByLabelText('Tenant name')).toHaveValue('Meera Sharma')
+
+    const stored = loadWorkspace()
+    const active = stored.documents[stored.activeDocumentId]
+    expect(active.agreement.agreementBuilder?.furnishing.level).toBe('fully-furnished')
+  })
+
   it('synchronizes the profile with the selected party and swaps names on a role change', async () => {
     render(<App />)
     const user = await login()
